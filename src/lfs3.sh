@@ -3,8 +3,10 @@ set -xe
 
 LB=~/lfs-build
 fi=$LB/scripts/5
-$lp=$LB/logs
-$LP=$LB/logs
+lp=$LB/logs
+LP=$LB/logs
+#HACK
+PATH=/tools/bin:/usr/local/bin:/bin:/usr/bin
 
 ch5_4() {
   echo -n "5.4.sh : " >> $LP/log5
