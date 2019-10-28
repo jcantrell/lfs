@@ -5,6 +5,7 @@ LB=~/lfs-build
 fi=$LB/scripts/5
 lp=$LB/logs
 LP=$LB/logs
+mkdir -p $LP
 #HACK
 PATH=/tools/bin:/usr/local/bin:/bin:/usr/bin
 
@@ -500,7 +501,6 @@ cs() {
 #bi=$LFS/lfs-build/scripts/buildit.sh
 #fi=$LFS/tools/lfs-build/scripts/5
 #lp=$LFS/tools/lfs-build/logs # logpath
-mkdir -p $LB
 cd $LFS/sources
 
 { time bi binutils-2.25	.tar.bz2	ch5_4	binutils-build >$lp/5.4.log 2>$lp/5.4.err ;  } 2> $lp/sbu
