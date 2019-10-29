@@ -1,2 +1,2 @@
 This project attempts to automate the Linux From Scratch project.
-Currently follows version 7.7 of LFS.
+Currently follows version 9.0 of LFS.

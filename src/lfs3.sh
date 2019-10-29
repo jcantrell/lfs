@@ -1,8 +1,13 @@
 # Chapter 5 - Constructing a Temporary System
 set -xe
 
+LB=~/lfs-build
+fi=$LB/scripts/5
+$lp=$LB/logs
+$LP=$LB/logs
+
 ch5_4() {
-  echo -n "5.4.sh : " >> $LFS/lfs-build/logs/log5
+  echo -n "5.4.sh : " >> $LP/log5
   mkdir -v ../binutils-build
   cd ../binutils-build
 
@@ -21,11 +26,11 @@ ch5_4() {
   esac
 
   make install
-  echo $? >> $LFS/lfs-build/logs/log5
+  echo $? >> $LP/log5
 }
 
 ch5_5() {
-  echo -n "5.5.sh : " >> $LFS/lfs-build/logs/log5
+  echo -n "5.5.sh : " >> $LP/log5
   tar -xf ../mpfr-3.1.2.tar.xz
   mv -v mpfr-3.1.2 mpfr
   tar -xf ../gmp-6.0.0a.tar.xz
@@ -80,11 +85,11 @@ ch5_5() {
   
   make install
   
-  echo $? >> $LFS/lfs-build/logs/log5
+  echo $? >> $LP/log5
 }
 
 ch5_6() {
-  echo -n "5.6.sh : " >> $LFS/lfs-build/logs/log5
+  echo -n "5.6.sh : " >> $LP/log5
   make mrproper
   make INSTALL_HDR_PATH=dest headers_install
   echo $? >> $LFS/lfs-build/logs/log5
@@ -92,7 +97,7 @@ ch5_6() {
 }
 
 ch5_7() {
-  echo -n "5.7.sh : " >> $LFS/lfs-build/logs/log5
+  echo -n "5.7.sh : " >> $LP/log5
   if [ ! -r /usr/include/rpc/types.h ]; then
     su -c 'mkdir -pv /usr/include/rpc'
     su -c 'cp -v sunrpc/rpc/*.h /usr/include/rpc'
@@ -114,18 +119,18 @@ ch5_7() {
         libc_cv_c_cleanup=yes
   make
   make install
-  echo $? >> $LFS/logs/log5
+  echo $? >> $LP/log5
    # Now test to make sure we compile correctly
   echo 'main(){}' > dummy.c
   $LFS_TGT-gcc dummy.c
-  readelf -l a.out | grep ': /tools' >> $LFS/logs/log5
+  readelf -l a.out | grep ': /tools' >> $LP/log5
   rm -v dummy.c a.out
   
-  echo $? >> $LFS/lfs-build/logs/log5
+  echo $? >> $LP/log5
 }
 
 ch5_8() {
-  echo -n "5.8.sh : " >> $LFS/lfs-build/logs/log5
+  echo -n "5.8.sh : " >> $LP/log5
   mkdir -pv ../gcc-build
   cd ../gcc-build
   ../gcc-4.9.2/libstdc++-v3/configure \
@@ -139,11 +144,11 @@ ch5_8() {
       --with-gxx-include-dir=/tools/$LFS_TGT/include/c++/4.9.2
   make
   make install
-  echo $? >> $LFS/lfs-build/logs/log5
+  echo $? >> $LP/log5
 }
 
 ch5_9() {
-  echo -n "5.9.sh : " >> $LFS/lfs-build/logs/log5
+  echo -n "5.9.sh : " >> $LP/log5
   mkdir -v ../binutils-build
   cd ../binutils-build
   
@@ -161,12 +166,12 @@ ch5_9() {
   make install
   make -C ld clean
   make -C ld LIB_PATH=/usr/lib:/lib
-  echo $? >> $LFS/lfs-build/logs/log5
+  echo $? >> $LP/log5
   cp -v ld/ld-new /tools/bin
 }
 
 ch5_10() {
-  echo -n "5.10.sh : " >> $LFS/lfs-build/logs/log5
+  echo -n "5.10.sh : " >> $LP/log5
   cat gcc/limitx.h gcc/glimits.h gcc/limity.h > \
     `dirname $($LFS_TGT-gcc -print-libgcc-file-name)`/include-fixed/limits.h
   for file in \
@@ -208,18 +213,18 @@ ch5_10() {
   
   make
   make install
-  echo $? >> $LFS/logs/log5
+  echo $? >> $LP/log5
   ln -sv gcc /tools/bin/cc
   
   echo 'main(){}' > dummy.c
   cc dummy.c
   readelf -l a.out | grep ': /tools' >> $LFS/logs/log5
   rm -v dummy.c a.out
-  echo $? >> $LFS/lfs-build/logs/log5
+  echo $? >> $LP/log5
 }
 
 ch5_11() {
-  echo -n "5.11.sh : " >> $LFS/lfs-build/logs/log5
+  echo -n "5.11.sh : " >> $LP/log5
   cd unix
   ./configure --prefix=/tools
   
@@ -236,7 +241,7 @@ ch5_11() {
 }
 
 ch5_12() {
-  echo -n "5.12.sh : " >> /mnt/lfs/lfs-build/logs/log5
+  echo -n "5.12.sh : " >> $LP/log5
   cp -v configure{,.orig}
   sed 's:/usr/local/bin:/bin:' configure.orig > configure
   
@@ -249,28 +254,28 @@ ch5_12() {
   make test
   
   make SCRIPTS="" install
-  echo $? >> $LFS/lfs-build/logs/log5
+  echo $? >> $LP/log5
 }
 
 ch5_13() {
-  echo -n "5.13.sh : " >> $LFS/lfs-build/logs/log5
+  echo -n "5.13.sh : " >> $LP/log5
   ./configure --prefix=/tools
   make install
-  echo $? >> $LFS/lfs-build/logs/log5
+  echo $? >> $LP/log5
   make check
 }
 
 ch5_14() {
-  echo -n "5.14.sh : " >> $LFS/lfs-build/logs/log5
+  echo -n "5.14.sh : " >> $LP/log5
   PKG_CONFIG= ./configure --prefix=/tools
   make
   make check
   make install
-  echo $? >> $LFS/lfs-build/logs/log5
+  echo $? >> $LP/log5
 }
 
 ch5_15() {
-  echo -n "5.15.sh : " >> $LFS/lfs-build/logs/log5
+  echo -n "5.15.sh : " >> $LP/log5
   ./configure --prefix=/tools \
               --with-shared   \
               --without-debug \
@@ -280,73 +285,73 @@ ch5_15() {
   
   make
   make install
-  echo $? >> $LFS/lfs-build/logs/log5
+  echo $? >> $LP/log5
 }
 
 ch5_16() {
-  echo -n "5.16.sh : " >> $LFS/lfs-build/logs/log5
+  echo -n "5.16.sh : " >> $LP/log5
   ./configure --prefix=/tools --without-bash-malloc
   make
   make test
   make install
-  echo $? >> $LFS/lfs-build/logs/log5
+  echo $? >> $LP/log5
   ln -sv bash /tools/bin/sh
 }
 
 ch5_17() {
-  echo -n "5.17.sh : " >> $LFS/lfs-build/logs/log5
+  echo -n "5.17.sh : " >> $LP/log5
   make
   make PREFIX=/tools install
-  echo $? >> $LFS/lfs-build/logs/log5
+  echo $? >> $LP/log5
 }
 
 ch5_18() {
-  echo -n "5.18.sh : " >> $LFS/lfs-build/logs/log5
+  echo -n "5.18.sh : " >> $LP/log5
   ./configure --prefix=/tools --enable-install-program=hostname
   make
   make RUN_EXPENSIVE_TESTS=yes check
   make install
-  echo $? >> $LFS/lfs-build/logs/log5
+  echo $? >> $LP/log5
 }
 
 ch5_19() {
-  echo -n "5.19.sh : " >> $LFS/lfs-build/logs/log5
+  echo -n "5.19.sh : " >> $LP/log5
   ./configure --prefix=/tools
   make
   make check
   make install
-  echo $? >> $LFS/lfs-build/logs/log5
+  echo $? >> $LP/log5
 }
 
 ch5_20() {
-  echo -n "5.20.sh : " >> $LFS/lfs-build/logs/log5
+  echo -n "5.20.sh : " >> $LP/log5
   ./configure --prefix=/tools
   make
   make check
   make install
-  echo $? >> $LFS/lfs-build/logs/log5
+  echo $? >> $LP/log5
 }
 
 ch5_21() {
-  echo -n "5.21.sh : " >> $LFS/lfs-build/logs/log5
+  echo -n "5.21.sh : " >> $LP/log5
   ./configure --prefix=/tools
   make
   make check
   make install
-  echo $? >> $LFS/lfs-build/logs/log5
+  echo $? >> $LP/log5
 }
 
 ch5_22() {
-  echo -n "5.22.sh : " >> $LFS/lfs-build/logs/log5
+  echo -n "5.22.sh : " >> $LP/log5
   ./configure --prefix=/tools
   make
   make check
   make install
-  echo $? >> $LFS/lfs-build/logs/log5
+  echo $? >> $LP/log5
 }
 
 ch5_23() {
-  echo -n "5.23.sh : " >> $LFS/lfs-build/logs/log5
+  echo -n "5.23.sh : " >> $LP/log5
   cd gettext-tools
   EMACS="no" ./configure --prefix=/tools --disable-shared
   make -C gnulib-lib
@@ -354,61 +359,61 @@ ch5_23() {
   make -C src msgfmt
   make -C src msgmerge
   make -C src xgettext
-  echo $? >> $LFS/lfs-build/logs/log5
+  echo $? >> $LP/log5
   cp -v src/{msgfmt,msgmerge,xgettext} /tools/bin
 }
 
 ch5_24() {
-  echo -n "5.24.sh : " >> $LFS/lfs-build/logs/log5
+  echo -n "5.24.sh : " >> $LP/log5
   ./configure --prefix=/tools
   make
   make check
   make install
-  echo $? >> $LFS/lfs-build/logs/log5
+  echo $? >> $LP/log5
 }
 
 ch5_25() {
-  echo -n "5.25.sh : " >> $LFS/lfs-build/logs/log5
+  echo -n "5.25.sh : " >> $LP/log5
   ./configure --prefix=/tools
   make
   make check
   make install
-  echo $? >> $LFS/lfs-build/logs/log5
+  echo $? >> $LP/log5
 }
 
 ch5_26() {
-  echo -n "5.26.sh : " >> $LFS/lfs-build/logs/log5
+  echo -n "5.26.sh : " >> $LP/log5
   ./configure --prefix=/tools
   make
   make check
   make install
-  echo $? >> $LFS/lfs-build/logs/log5
+  echo $? >> $LP/log5
 }
 
 ch5_27() {
-  echo -n "5.27.sh : " >> $LFS/lfs-build/logs/log5
+  echo -n "5.27.sh : " >> $LP/log5
   ./configure --prefix=/tools --without-guile
   make
   make check
   make install
-  echo $? >> $LFS/lfs-build/logs/log5
+  echo $? >> $LP/log5
 }
 
 ch5_28() {
-  echo -n "5.28.sh : " >> $LFS/lfs-build/logs/log5
+  echo -n "5.28.sh : " >> $LP/log5
   ./configure --prefix=/tools
   make
   make check
   make install
-  echo $? >> $LFS/lfs-build/logs/log5
+  echo $? >> $LP/log5
 }
 
 ch5_29() {
-  echo -n "5.29.sh : " >> $LFS/lfs-build/logs/log5
+  echo -n "5.29.sh : " >> $LP/log5
   sh Configure -des -Dprefix=/tools -Dlibs=-lm
   
   make
-  echo $? >> $LFS/lfs-build/logs/log5
+  echo $? >> $LP/log5
   
   cp -v perl cpan/podlators/pod2man /tools/bin
   mkdir -pv /tools/lib/perl5/5.20.2
@@ -416,34 +421,34 @@ ch5_29() {
 }
 
 ch5_30() {
-  echo -n "5.30.sh : " >> $LFS/lfs-build/logs/log5
+  echo -n "5.30.sh : " >> $LP/log5
   ./configure --prefix=/tools
   make
   make check
   make install
-  echo $? >> $LFS/lfs-build/logs/log5
+  echo $? >> $LP/log5
 }
 
 ch5_31() {
-  echo -n "5.31.sh : " >> $LFS/lfs-build/logs/log5
+  echo -n "5.31.sh : " >> $LP/log5
   ./configure --prefix=/tools
   make
   make check
   make install
-  echo $? >> $LFS/lfs-build/logs/log5
+  echo $? >> $LP/log5
 }
 
 ch5_32() {
-  echo -n "5.32.sh : " >> $LFS/lfs-build/logs/log5
+  echo -n "5.32.sh : " >> $LP/log5
   ./configure -prefix=/tools
   make
   make check
   make install
-  echo $? >> $LFS/lfs-build/logs/log5
+  echo $? >> $LP/log5
 }
 
 ch5_33() {
-  echo -n "5.33.sh : " >> $LFS/lfs-build/logs/log5
+  echo -n "5.33.sh : " >> $LP/log5
   ./configure --prefix=/tools                \
               --without-python               \
               --disable-makeinstall-chown    \
@@ -452,33 +457,29 @@ ch5_33() {
   
   make
   make install
-  echo $? >> $LFS/lfs-build/logs/log5
+  echo $? >> $LP/log5
 }
 
 ch5_34() {
-  echo -n "5.34.sh : " >> $LFS/lfs-build/logs/log5
+  echo -n "5.34.sh : " >> $LP/log5
   ./configure --prefix=/tools
   make
   make check
   make install
-  echo $? >> $LFS/lfs-build/logs/log5
+  echo $? >> $LP/log5
 }
 
 ch5_35() {
-  echo -n "5.35.sh : " >> $LFS/lfs-build/logs/log5
+  echo -n "5.35.sh : " >> $LP/log5
   strip --strip-debug /tools/lib/*
   /usr/bin/strip --strip-unneeded /tools/{,s}bin/*
   rm -rf /tools/{,share}/{info,man,doc}
-  echo $? >> $LFS/lfs-build/logs/log5
+  echo $? >> $LP/log5
 }
 
 ch5_36() {
   chown -R root:root $LFS/tools
 }
-
-LB=~/lfs-build
-fi=$LB/scripts/5
-lp=$LB/logs
 
 #buildit
 bi() {
