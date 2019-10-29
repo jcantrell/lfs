@@ -4,10 +4,13 @@ set -xe
 cat > version-check.sh << "EOF"
 #!/bin/bash
 # Simple script to list version numbers of critical development tools
-
 export LC_ALL=C
 bash --version | head -n1 | cut -d" " -f2-4
-echo "/bin/sh -> `readlink -f /bin/sh`"
+MYSH=$(readlink -f /bin/sh)
+echo "/bin/sh -> $MYSH"
+echo $MYSH | grep -q bash || echo "ERROR: /bin/sh does not point to bash"
+unset MYSH
+
 echo -n "Binutils: "; ld --version | head -n1 | cut -d" " -f3-
 bison --version | head -n1
 
@@ -28,7 +31,7 @@ gawk --version | head -n1
 if [ -h /usr/bin/awk ]; then
   echo "/usr/bin/awk -> `readlink -f /usr/bin/awk`";
 elif [ -x /usr/bin/awk ]; then
-  echo yacc is `/usr/bin/awk --version | head -n1`
+  echo awk is `/usr/bin/awk --version | head -n1`
 else 
   echo "awk not found" 
 fi
@@ -43,12 +46,13 @@ m4 --version | head -n1
 make --version | head -n1
 patch --version | head -n1
 echo Perl `perl -V:version`
+python3 --version
 sed --version | head -n1
 tar --version | head -n1
-makeinfo --version | head -n1
+makeinfo --version | head -n1  # texinfo version
 xz --version | head -n1
 
-echo 'main(){}' > dummy.c && g++ -o dummy dummy.c
+echo 'int main(){}' > dummy.c && g++ -o dummy dummy.c
 if [ -x dummy ]
   then echo "g++ compilation OK";
   else echo "g++ compilation failed"; fi
@@ -56,16 +60,6 @@ rm -f dummy.c dummy
 EOF
 
 bash version-check.sh
-cat > library-check.sh << "EOF"
-#!/bin/bash
-for lib in lib{gmp,mpfr,mpc}.la; do
-  echo $lib: $(if find /usr/lib* -name $lib|
-               grep -q $lib;then :;else echo not;fi) found
-done
-unset lib
-EOF
-
-bash library-check.sh
 sed -e 's/\s*\([\+0-9a-zA-Z]*\).*/\1/' << EOF | sudo fdisk /dev/sda
   n   # new partition
   p   # partition
