@@ -109,11 +109,11 @@ popd
 # Chapter 4 - Final Preparations
 mkdir -v $LFS/tools
 ln -sv $LFS/tools /
-#groupadd lfs
-addgroup lfs
-#useradd -s /bin/bash -g lfs -m -k /dev/null lfs
-adduser -s /bin/bash -G lfs lfs
-#passwd lfs
+groupadd lfs
+#addgroup lfs
+useradd -s /bin/bash -g lfs -m -k /dev/null lfs
+#adduser -s /bin/bash -G lfs lfs
+passwd lfs
 chown -v lfs $LFS/tools
 chown -v lfs $LFS/sources
 su - lfs # make sure to run lfs2.sh as user lfs - could we pass the file to su?

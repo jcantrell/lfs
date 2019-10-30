@@ -8,15 +8,16 @@ LP=$LB/logs
 mkdir -p $LP
 TESTS=""
 JOPT="-j `nproc`"
+#JOPT=""
+
 #HACK
-PATH=/tools/bin:/usr/local/bin:/bin:/usr/bin
+#PATH=/tools/bin:/usr/local/bin:/bin:/usr/bin
 
 ch5_4() {
-  echo -n "5.4.sh : " >> $LP/log5
-  mkdir -v ../binutils-build
-  cd ../binutils-build
+  mkdir -v build
+  cd build
 
-  ../"$1"/configure --prefix=/tools            \
+  ../configure --prefix=/tools            \
                              --with-sysroot=$LFS        \
                              --with-lib-path=/tools/lib \
                              --target=$LFS_TGT          \
@@ -30,7 +31,8 @@ ch5_4() {
   esac
 
   make install
-  echo $? >> $LP/log5
+
+  cd ..
 }
 
 ch5_5() {
@@ -53,6 +55,12 @@ ch5_5() {
   #define STANDARD_STARTFILE_PREFIX_2 ""' >> $file
     touch $file.orig
   done
+
+  case $(uname -m) in
+    x86_64)
+      sed -e '/m64=/s/lib64/lib/' -i.orig gcc/config/i386/t-linux64
+    ;;
+  esac
   
   mkdir -v build
   cd build
@@ -76,12 +84,14 @@ ch5_5() {
       --disable-libquadmath                            \
       --disable-libssp                                 \
       --disable-libvtv                                 \
-      --disable-libstdc++                              \
+      --disable-libstdcxx                              \
       --enable-languages=c,c++
   
   make $JOPT
   
   make install
+
+  cd ..
 }
 
 ch5_6() {
@@ -107,10 +117,13 @@ ch5_7() {
   $LFS_TGT-gcc dummy.c
   readelf -l a.out | grep ': /tools' >> $LP/log5
   rm -v dummy.c a.out
+  cd ..
 }
 
 ch5_8() {
-../libstdc++-v3/configure           \
+  mkdir -v build
+  cd build
+  ../libstdc++-v3/configure           \
     --host=$LFS_TGT                 \
     --prefix=/tools                 \
     --disable-multilib              \
@@ -120,6 +133,7 @@ ch5_8() {
     --with-gxx-include-dir=/tools/$LFS_TGT/include/c++/9.2.0
   make $JOPT
   make install
+  cd ..
 }
 
 ch5_9() {
@@ -141,6 +155,8 @@ ch5_9() {
   make -C ld clean
   make -C ld LIB_PATH=/usr/lib:/lib
   cp -v ld/ld-new /tools/bin
+
+  cd ..
 }
 
 ch5_10() {
@@ -198,6 +214,7 @@ ch5_10() {
   cc dummy.c
   readelf -l a.out | grep ': /tools' >> $LFS/logs/log5
   rm -v dummy.c a.out
+  cd ..
 }
 
 ch5_11() {
@@ -212,6 +229,8 @@ ch5_11() {
   chmod -v u+w /tools/lib/libtcl8.6.so
   make install-private-headers
   ln -sv tclsh8.6 /tools/bin/tclsh
+
+  cd ..
 }
 
 ch5_12() {
@@ -269,7 +288,7 @@ ch5_16() {
 
 ch5_17() {
   ./configure --prefix=/tools
-  make
+  make $JOPT
   [ ! -z $TESTS ] && make check
   make install
 }
@@ -281,7 +300,7 @@ ch5_18() {
 
 ch5_19() {
   ./configure --prefix=/tools --enable-install-program=hostname
-  make
+  make $JOPT
   [ ! -z $TESTS ] && make RUN_EXPENSIVE_TESTS=yes check
   make install
 }
@@ -295,7 +314,7 @@ ch5_20() {
 
 ch5_21() {
   ./configure --prefix=/tools
-  make
+  make $JOPT
   [ ! -z $TESTS ] && make check
   make install
 }
@@ -409,55 +428,57 @@ ch5_36() {
 }
 
 #buildit
+# package,version,extension,chapter/section number
 bi() {
   tar -xf $LFS/sources/$1$2
   cd $1
-  $3 $1
+  $3
   cd ..
-  rm -rf $1 $4
+  rm -rf $1 #$4
 }
 
 # compile source
-cs() {
-  echo "hello"
+cs() { # package, extension, chapternum
+  PK=$1; EXT=$2; NUM=$3;
+  tar -xf $LFS/sources/$PK$EXT
+  cd $PK
+  ch5_$NUM >$LP/5.$NUM.log 2>$LP/5.$NUM.err
+  cd ..
+  rm -rf $PK
+  #bi $PK $EXT ch5_$NUM >$LP/5.$NUM.log 2>$LP/5.$NUM.err
 }
 
-#bi=$LFS/lfs-build/scripts/buildit.sh
-#fi=$LFS/tools/lfs-build/scripts/5
-#lp=$LFS/tools/lfs-build/logs # logpath
 cd $LFS/sources
 
-{ time 
-bi binutils-2.32	.tar.xz	ch5_4	binutils-build >$lp/5.4.log 2>$lp/5.4.err ;
-} 2> $lp/sbu
-bi gcc-9.2.0		.tar.bz2	ch5_5	gcc-build	>$lp/5.5.log	2>$lp/5.5.err
-bi linux-5.2.8		.tar.xz		ch5_6 >$lp/5.6.log	2>$lp/5.6.err
-bi glibc-2.30		.tar.xz		ch5_7	glibc-build	>$lp/5.7.log	2>$lp/5.7.err
-bi gcc-9.2.0		.tar.bz2	ch5_8	gcc-build	>$lp/5.8.log	2>$lp/5.8.err
-bi binutils-2.32	.tar.bz2	ch5_9	binutils-build	>$lp/5.9.log	2>$lp/5.9.err
-bi gcc-9.2.0		.tar.bz2	ch5_10	gcc-build	>$lp/5.10.log	2>$lp/5.10.err
-bi tcl8.6.9		-src.tar.gz	ch5_11			>$lp/5.11.log	2>$lp/5.11.err
-bi expect5.45.4		.tar.gz		ch5_12			>$lp/5.12.log	2>$lp/5.12.err
-bi dejagnu-1.6.2	.tar.gz		ch5_13			>$lp/5.13.log	2>$lp/5.13.err
-bi m4-1.4.18	.tar.xz		ch5_14			>$lp/5.14.log	2>$lp/5.14.err
-bi ncurses-6.1     .tar.gz ch5_15 >$lp/5.15.log 2>$lp/5.15.err
-bi bash-5.0        .tar.gz ch5_16 >$lp/5.16.log 2>$lp/5.16.err
-bi bison-3.4.1     .tar.xz ch5_17 >$LP/5.17.log 2>$LP/5.17.err
-bi bzip2-1.0.8     .tar.gz ch5_18 >$lp/5.18.log 2>$lp/5.18.err
-bi coreutils-8.31  .tar.xz ch5_19 >$lp/5.19.log 2>$lp/5.19.err
-bi diffutils-3.7   .tar.xz ch5_20 >$lp/5.20.log 2>$lp/5.20.err
-bi file-5.37       .tar.gz ch5_21 >$lp/5.21.log 2>$lp/5.21.err
-bi findutils-4.6.0 .tar.gz ch5_22 >$lp/5.22.log 2>$lp/5.22.err
-bi gawk-5.0.1      .tar.xz ch5_23 >$lp/5.23.log 2>$lp/5.23.err
-bi gettext-0.20.1  .tar.xz ch5_24 >$lp/5.24.log 2>$lp/5.24.err
-bi grep-3.3        .tar.xz ch5_25 >$lp/5.25.log 2>$lp/5.25.err
-bi gzip-1.10       .tar.xz ch5_26 >$lp/5.26.log 2>$lp/5.26.err
-bi make-4.2.1      .tar.gz ch5_27 >$lp/5.27.log 2>$lp/5.27.err
-bi patch-2.7.6     .tar.xz ch5_28 >$lp/5.28.log 2>$lp/5.28.err
-bi perl-5.30.0     .tar.xz ch5_29 >$lp/5.29.log 2>$lp/5.29.err
-bi Python-3.7.4    .tar.xz ch5_30 >$LP/5.30.log 2>$LP/5.30.err
-bi sed-4.7         .tar.xz ch5_31 >$lp/5.31.log 2>$lp/5.31.err
-bi tar-1.32        .tar.xz ch5_32 >$lp/5.32.log 2>$lp/5.32.err
-bi texinfo-6.6     .tar.xz ch5_33 >$lp/5.33.log 2>$lp/5.33.err
-bi xz-5.2.4        .tar.xz ch5_34 >$lp/5.34.log 2>$lp/5.34.err
-ch5_35                            >$lp/5_35.log 2>$lp/5.35.err
+{ time cs binutils-2.32 .tar.xz 4; } 2> $LP/sbu
+cs gcc-9.2.0       .tar.xz 5
+cs linux-5.2.8     .tar.xz 6
+cs glibc-2.30      .tar.xz 7
+cs gcc-9.2.0       .tar.xz 8
+cs binutils-2.32   .tar.xz 9
+cs gcc-9.2.0       .tar.xz 10
+cs tcl8.6.9    -src.tar.gz 11
+cs expect5.45.4    .tar.gz 12
+cs dejagnu-1.6.2   .tar.gz 13
+cs m4-1.4.18       .tar.xz 14 
+cs ncurses-6.1     .tar.gz 15
+cs bash-5.0        .tar.gz 16
+cs bison-3.4.1     .tar.xz 17 
+cs bzip2-1.0.8     .tar.gz 18
+cs coreutils-8.31  .tar.xz 19 
+cs diffutils-3.7   .tar.xz 20
+cs file-5.37       .tar.gz 21
+cs findutils-4.6.0 .tar.gz 22 
+cs gawk-5.0.1      .tar.xz 23
+cs gettext-0.20.1  .tar.xz 24
+cs grep-3.3        .tar.xz 25
+cs gzip-1.10       .tar.xz 26
+cs make-4.2.1      .tar.gz 27
+cs patch-2.7.6     .tar.xz 28
+cs perl-5.30.0     .tar.xz 29
+cs Python-3.7.4    .tar.xz 30
+cs sed-4.7         .tar.xz 31
+cs tar-1.32        .tar.xz 32
+cs texinfo-6.6     .tar.xz 33
+cs xz-5.2.4        .tar.xz 34
+ch5_35 >$LP/5_35.log 2>$LP/5.35.err

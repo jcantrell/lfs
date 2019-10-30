@@ -14,7 +14,12 @@ THREADS := $(shell nproc)
 RAM := $(shell free -h | sed '1d;q' | awk '{print $$7;}')
 IMG := lfs.img
 #echo $(RAM)
-lfs:
+86lfs:
 	qemu-img create $(IMG) 20G
 	qemu-system-i386 -smp $(THREADS) -m $(RAM) -hda $(IMG) -cdrom Core-10.1.iso
+	rm $(IMG)
+
+64lfs:
+	qemu-img create $(IMG) 20G
+	qemu-system-x86_64 -smp $(THREADS) -m $(RAM) -hda $(IMG) -cdrom CorePure64-current.iso
 	rm $(IMG)
