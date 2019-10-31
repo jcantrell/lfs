@@ -212,7 +212,7 @@ ch5_10() {
   
   echo 'int main(){}' > dummy.c
   cc dummy.c
-  readelf -l a.out | grep ': /tools' >> $LFS/logs/log5
+  readelf -l a.out | grep ': /tools' >> $LP/log5
   rm -v dummy.c a.out
   cd ..
 }
@@ -424,7 +424,7 @@ ch5_35() {
 }
 
 ch5_36() {
-  chown -R root:root $LFS/tools
+  su - root -c "chown -R root:root $LFS/tools"
 }
 
 #buildit
@@ -482,4 +482,4 @@ cs tar-1.32        .tar.xz 32
 cs texinfo-6.6     .tar.xz 33
 cs xz-5.2.4        .tar.xz 34
 ch5_35 >$LP/5_35.log 2>$LP/5.35.err
-#ch5_36 # where to put this?
+ch5_36 # where to put this?
