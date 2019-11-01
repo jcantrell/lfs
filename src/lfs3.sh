@@ -1,10 +1,7 @@
 # Chapter 5 - Constructing a Temporary System
 set -xe
 
-LB=~/lfs-build
-fi=$LB/scripts/5
-lp=$LB/logs
-LP=$LB/logs
+LP=~/lfs-build/logs
 mkdir -p $LP
 TESTS=""
 JOPT="-j `nproc`"

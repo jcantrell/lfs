@@ -572,6 +572,7 @@ chroot "$LFS" /usr/bin/env -i          \
     PS1='(lfs chroot) \u:\w\$ '        \
     PATH=/bin:/usr/bin:/sbin:/usr/sbin \
     /bin/bash --login
+
 rm -f /usr/lib/lib{bfd,opcodes}.a
 rm -f /usr/lib/libbz2.a
 rm -f /usr/lib/lib{com_err,e2p,ext2fs,ss}.a
@@ -581,6 +582,48 @@ rm -f /usr/lib/libz.a
 find /usr/lib /usr/libexec -name \*.la -delete
 }
 
-bs ch6_35
-bs ch6_36
-bs ch6_37
+bs ch6_35 libtool-2.4.6   .tar.xz
+bs ch6_36 gdbm-1.18.1     .tar.gz
+bs ch6_37 gperf-3.1       .tar.gz
+bs ch6_38 expat-2.2.7     .tar.xz
+bs ch6_39 inetutils-1.9.4 .tar.xz
+bs ch6_40 perl-5.30.0     .tar.xz
+bs ch6_41 XML-Parser-2.44 .tar.gz
+bs ch6_42 intltool-0.51.0 .tar.gz
+bs ch6_43 autoconf-2.69   .tar.xz
+bs ch6_44 automake-1.16.1 .tar.xz
+bs ch6_45 xz-5.2.4        .tar.xz
+bs ch6_46 kmod-26         .tar.xz
+bs ch6_47 gettext-0.20.1  .tar.xz
+bs ch6_48 elfutils-0.177  .tar.bz2
+bs ch6_49 libffi-3.2.1    .tar.gz
+bs ch6_50 openssl-1.1.1c  .tar.gz
+bs ch6_51 Python-3.7.4    .tar.xz
+bs ch6_52 ninja-1.9.0     .tar.gz
+bs ch6_53 meson-0.51.1    .tar.gz
+bs ch6_54 coreutils-8.31  .tar.xz
+bs ch6_55 check-0.12.0    .tar.gz
+bs ch6_56 diffutils-3.7   .tar.xz
+bs ch6_57 gawk-5.0.1      .tar.xz
+bs ch6_58 findutils-4.6.0 .tar.gz
+bs ch6_59 groff-1.22.4    .tar.gz
+bs ch6_60 grub-2.04       .tar.xz
+bs ch6_61 less-551        .tar.gz
+bs ch6_62 gzip-1.10       .tar.xz
+bs ch6_63 iproute2-5.2.0  .tar.xz
+bs ch6_64 kbd-2.2.0       .tar.xz
+bs ch6_65 libpipeline-1.5.1 .tar.gz
+bs ch6_66 make-4.2.1      .tar.gz
+bs ch6_67 patch-2.7.6     .tar.xz
+bs ch6_68 man-db-2.8.6.1  .tar.xz
+bs ch6_69 tar-1.32        .tar.xz
+bs ch6_70 texinfo-6.6     .tar.xz
+bs ch6_71 vim-8.1.1846    .tar.gz
+bs ch6_72 procps-ng-3.3.15 .tar.xz
+bs ch6_73 util-linux-2.34 .tar.xz
+bs ch6_74 e2fsprogs-1.45.3 .tar.gz
+bs ch6_75 sysklogd-1.5.1 .tar.gz
+bs ch6_76 sysvinit-2.95  .tar.xz
+bs ch6_77 eudev-3.2.8    .tar.gz
+ch6_79
+ch6_80

@@ -17,5 +17,5 @@ Step 6: Change to chroot environment (source the script so it will see
 `# . lfs/src/lfs5.sh`
 Step 7: Obtain lfs scripts within chroot environment
 `wget 10.0.0.133/lfs/9.0/src/lfs6.sh`
-Step 8: Even more preparation
+Step 8: Run new bash
 `$ bash lfs/src/lfs6.sh`

@@ -21,7 +21,7 @@ ch6_8() {
   make install
 }
 
-ch 6_9() {
+ch6_9() {
   patch -Np1 -i ../glibc-2.21-fhs-1.patch
 
   sed -i '/asm.socket.h/a# include <linux/sockios.h>' \
@@ -488,33 +488,44 @@ ch6_34() {
 }
 
 
+# compile source
+bs() { # package, extension, chapternum
+  PK=$2; EXT=$3; NUM=$1;
+  tar -xf $LFS/sources/$PK$EXT
+  cd $PK
+  $NUM >$LP/$NUM.log 2>$LP/$NUM.err
+  cd ..
+  rm -rf $PK
+  #bi $PK $EXT ch5_$NUM >$LP/5.$NUM.log 2>$LP/5.$NUM.err
+}
+
 ch6_6
-bs ch6_7
-bs ch6_8
-bs ch6_9
+bs ch6_7 linux-5.2.8    .tar.xz
+bs ch6_8 man-pages-5.02 .tar.xz
+bs ch6_9 glibc-2.30     .tar.xz
 ch6_10
-bs ch6_11
-bs ch6_12
-bs ch6_13
-bs ch6_14
-bs ch6_15
-bs ch6_16
-bs ch6_17
-bs ch6_18
-bs ch6_19
-bs ch6_20
-bs ch6_21
-bs ch6_22
-bs ch6_23
-bs ch6_24
-bs ch6_25
-bs ch6_26
-bs ch6_27
-bs ch6_28
-bs ch6_29
-bs ch6_30
-bs ch6_31
-bs ch6_32
-bs ch6_33
+bs ch6_11 zlib-1.2.11   .tar.xz
+bs ch6_12 file-5.37     .tar.gz
+bs ch6_13 readline-8.0  .tar.gz
+bs ch6_14 m4-1.4.18     .tar.xz
+bs ch6_15 bc-2.1.3      .tar.gz
+bs ch6_16 binutils-2.32 .tar.xz
+bs ch6_17 gmp-6.1.2     .tar.xz
+bs ch6_18 mpfr-4.0.2    .tar.xz
+bs ch6_19 mpc-1.1.0     .tar.gz
+bs ch6_20 shadow-4.7    .tar.xz
+bs ch6_21 gcc-9.2.0     .tar.xz
+bs ch6_22 bzip2-1.0.8   .tar.gz
+bs ch6_23 pkg-config-0.29.2 .tar.gz
+bs ch6_24 ncurses-6.1   .tar.gz
+bs ch6_25 attr-2.4.48   .tar.gz
+bs ch6_26 acl-2.2.53    .tar.gz
+bs ch6_27 libcap-2.27   .tar.xz
+bs ch6_28 sed-4.7       .tar.xz
+bs ch6_29 psmisc-23.2   .tar.xz
+bs ch6_30 iana-etc-2.30 .tar.bz2
+bs ch6_31 bison-3.4.1   .tar.xz
+bs ch6_32 flex-2.6.4    .tar.gz
+bs ch6_33 grep-3.3      .tar.xz
 # new shell started at end of ch6_34
-bs ch6_34
+bs ch6_34 bash-5.0      .tar.gz
