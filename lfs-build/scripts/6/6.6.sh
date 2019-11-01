@@ -1,8 +1,8 @@
-ln -sv /tools/bin/{bash,cat,echo,pwd,stty} /bin
-ln -sv /tools/bin/perl /usr/bin
-ln -sv /tools/lib/libgcc_s.so{,.1} /usr/lib
-ln -sv /tools/lib/libstdc++.so{,.6} /usr/lib
-sed 's/tools/usr/' /tools/lib/libstdc++.la > /usr/lib/libstdc++.la
+ln -sv /tools/bin/{bash,cat,chmod,dd,echo,ln,mkdir,pwd,rm,stty,touch} /bin
+ln -sv /tools/bin/{env,install,perl,printf}         /usr/bin
+ln -sv /tools/lib/libgcc_s.so{,.1}                  /usr/lib
+ln -sv /tools/lib/libstdc++.{a,so{,.6}}             /usr/lib
+
 ln -sv bash /bin/sh
 
 ln -sv /proc/self/mounts /etc/mtab
@@ -34,9 +34,10 @@ usb:x:14:
 cdrom:x:15:
 adm:x:16:
 messagebus:x:18:
-systemd-journal:x:23:
 input:x:24:
 mail:x:34:
+kvm:x:61:
+wheel:x:97:
 nogroup:x:99:
 users:x:999:
 EOF

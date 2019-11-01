@@ -1,5 +1,3 @@
-echo -n "6.9.sh : " >> /lfs-build/logs/log6
-
 patch -Np1 -i ../glibc-2.21-fhs-1.patch
 sed -e '/ia32/s/^/1:/' \
     -e '/SSE2/s/^1://' \

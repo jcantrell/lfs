@@ -1,5 +1,3 @@
-whoami
-echo $LFS
 chroot "$LFS" /tools/bin/env -i \
     HOME=/root                  \
     TERM="$TERM"                \

@@ -251,7 +251,7 @@ ch5_12() {
 ch5_13() {
   ./configure --prefix=/tools
   make install
-  [ ! -z $TESTS ] && make check
+  if [ ! -z $TESTS ]; then make check; fi
 }
 
 ch5_14() {
@@ -482,3 +482,4 @@ cs tar-1.32        .tar.xz 32
 cs texinfo-6.6     .tar.xz 33
 cs xz-5.2.4        .tar.xz 34
 ch5_35 >$LP/5_35.log 2>$LP/5.35.err
+#ch5_36 # where to put this?
