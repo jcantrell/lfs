@@ -60,7 +60,7 @@ rm -f dummy.c dummy
 EOF
 
 bash version-check.sh
-sed -e 's/\s*\([\+0-9a-zA-Z]*\).*/\1/' << EOF | sudo fdisk /dev/sda
+sed -e 's/\s*\([\+0-9a-zA-Z]*\).*/\1/' << EOF | fdisk /dev/sda
   n   # new partition
   p   # partition
   1   # first
@@ -82,14 +82,13 @@ EOF
 # Chapter 2
 SWAPPART="/dev/sda1"
 LFSPART="/dev/sda2"
-sudo mkfs -v -t ext4 "$LFSPART"
+mkfs -v -t ext4 "$LFSPART"
 mkswap "$SWAPPART"
 
 export LFS=/mnt/lfs
 mkdir -pv $LFS
-sudo mount -v -t ext4 "$LFSPART" $LFS
-#sudo /sbin/swapon -v "$SWAPPART"
-sudo /sbin/swapon "$SWAPPART"
+mount -v -t ext4 "$LFSPART" $LFS
+/sbin/swapon -v "$SWAPPART"
 
 # Chapter 3 - Packages and Patches
 mkdir -v $LFS/sources
@@ -110,9 +109,7 @@ popd
 mkdir -v $LFS/tools
 ln -sv $LFS/tools /
 groupadd lfs
-#addgroup lfs
 useradd -s /bin/bash -g lfs -m -k /dev/null lfs
-#adduser -s /bin/bash -G lfs lfs
 passwd lfs
 chown -v lfs $LFS/tools
 chown -v lfs $LFS/sources

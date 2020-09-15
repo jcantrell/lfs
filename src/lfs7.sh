@@ -44,16 +44,17 @@ CC="gcc -ffile-prefix-map=/tools=/usr" \
              --enable-kernel=3.2                    \
              --enable-stack-protector=strong        \
              --with-headers=/usr/include            \
-             libc_cv_slibdir=/lib
-make
+             libc_cv_slibdir=/lib	\
+						>$LP/ch6_9.conf.log 2>$LP/ch6_9.conf.err
+make >$LP/ch6_9.conf.log 2>$LP/ch6_9.conf.err
 case $(uname -m) in
   i?86)   ln -sfnv $PWD/elf/ld-linux.so.2        /lib ;;
   x86_64) ln -sfnv $PWD/elf/ld-linux-x86-64.so.2 /lib ;;
 esac
-make check
+make check >$LP/ch6_9.conf.log 2>$LP/ch6_9.conf.err
 touch /etc/ld.so.conf
 sed '/test-installation/s@$(PERL)@echo not running@' -i ../Makefile
-make install
+make install >$LP/ch6_9.conf.log 2>$LP/ch6_9.conf.err
 cp -v ../nscd/nscd.conf /etc/nscd.conf
 mkdir -pv /var/cache/nscd
 mkdir -pv /usr/lib/locale

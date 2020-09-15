@@ -3,7 +3,7 @@ set -xe
 
 LP=~/lfs-build/logs
 mkdir -p $LP
-TESTS=""
+TESTS="1"
 JOPT="-j `nproc`"
 #JOPT=""
 
@@ -108,11 +108,10 @@ ch5_7() {
         --with-headers=/tools/include                 
   make $JOPT
   make install
-  echo $? >> $LP/log5
    # Now test to make sure we compile correctly
   echo 'int main(){}' > dummy.c
   $LFS_TGT-gcc dummy.c
-  readelf -l a.out | grep ': /tools' >> $LP/log5
+  readelf -l a.out | grep ': /tools'
   rm -v dummy.c a.out
   cd ..
 }
@@ -209,7 +208,7 @@ ch5_10() {
   
   echo 'int main(){}' > dummy.c
   cc dummy.c
-  readelf -l a.out | grep ': /tools' >> $LP/log5
+  readelf -l a.out | grep ': /tools'
   rm -v dummy.c a.out
   cd ..
 }
@@ -442,41 +441,48 @@ cs() { # package, extension, chapternum
   ch5_$NUM >$LP/5.$NUM.log 2>$LP/5.$NUM.err
   cd ..
   rm -rf $PK
-  #bi $PK $EXT ch5_$NUM >$LP/5.$NUM.log 2>$LP/5.$NUM.err
 }
 
 cd $LFS/sources
 
-{ time cs binutils-2.32 .tar.xz 4; } 2> $LP/sbu
-cs gcc-9.2.0       .tar.xz 5
-cs linux-5.2.8     .tar.xz 6
-cs glibc-2.30      .tar.xz 7
-cs gcc-9.2.0       .tar.xz 8
-cs binutils-2.32   .tar.xz 9
-cs gcc-9.2.0       .tar.xz 10
-cs tcl8.6.9    -src.tar.gz 11
-cs expect5.45.4    .tar.gz 12
-cs dejagnu-1.6.2   .tar.gz 13
-cs m4-1.4.18       .tar.xz 14 
-cs ncurses-6.1     .tar.gz 15
-cs bash-5.0        .tar.gz 16
-cs bison-3.4.1     .tar.xz 17 
-cs bzip2-1.0.8     .tar.gz 18
-cs coreutils-8.31  .tar.xz 19 
-cs diffutils-3.7   .tar.xz 20
-cs file-5.37       .tar.gz 21
-cs findutils-4.6.0 .tar.gz 22 
-cs gawk-5.0.1      .tar.xz 23
-cs gettext-0.20.1  .tar.xz 24
-cs grep-3.3        .tar.xz 25
-cs gzip-1.10       .tar.xz 26
-cs make-4.2.1      .tar.gz 27
-cs patch-2.7.6     .tar.xz 28
-cs perl-5.30.0     .tar.xz 29
-cs Python-3.7.4    .tar.xz 30
-cs sed-4.7         .tar.xz 31
-cs tar-1.32        .tar.xz 32
-cs texinfo-6.6     .tar.xz 33
-cs xz-5.2.4        .tar.xz 34
-ch5_35 >$LP/5_35.log 2>$LP/5.35.err
-ch5_36 # where to put this?
+case "$1" in
+  4) { time cs binutils-2.32 .tar.xz 4; } 2> $LP/sbu ;;
+  5) cs gcc-9.2.0       .tar.xz 5 ;;
+  6) cs linux-5.2.8     .tar.xz 6 ;;
+  7) cs glibc-2.30      .tar.xz 7 ;;
+  8) cs gcc-9.2.0       .tar.xz 8 ;;
+  9) cs binutils-2.32   .tar.xz 9 ;;
+  10) cs gcc-9.2.0       .tar.xz 10 ;;
+  11) cs tcl8.6.9    -src.tar.gz 11 ;;
+  12) cs expect5.45.4    .tar.gz 12 ;;
+  13) cs dejagnu-1.6.2   .tar.gz 13 ;;
+  14) cs m4-1.4.18       .tar.xz 14 ;;
+  15) cs ncurses-6.1     .tar.gz 15 ;;
+  16) cs bash-5.0        .tar.gz 16 ;;
+  17) cs bison-3.4.1     .tar.xz 17 ;;
+  18) cs bzip2-1.0.8     .tar.gz 18 ;;
+  19) cs coreutils-8.31  .tar.xz 19 ;;
+  20) cs diffutils-3.7   .tar.xz 20 ;;
+  21) cs file-5.37       .tar.gz 21 ;;
+  22) cs findutils-4.6.0 .tar.gz 22 ;;
+  23) cs gawk-5.0.1      .tar.xz 23 ;;
+  24) cs gettext-0.20.1  .tar.xz 24 ;;
+  25) cs grep-3.3        .tar.xz 25 ;;
+  26) cs gzip-1.10       .tar.xz 26 ;;
+  27) cs make-4.2.1      .tar.gz 27 ;;
+  28) cs patch-2.7.6     .tar.xz 28 ;;
+  29) cs perl-5.30.0     .tar.xz 29 ;;
+  30) cs Python-3.7.4    .tar.xz 30 ;;
+  31) cs sed-4.7         .tar.xz 31 ;;
+  32) cs tar-1.32        .tar.xz 32 ;;
+  33) cs texinfo-6.6     .tar.xz 33 ;;
+  34) cs xz-5.2.4        .tar.xz 34 ;;
+  35) ch5_35 >$LP/5_35.log 2>$LP/5.35.err ;;
+  36) ch5_36 ;; # where to put this?
+  *) 
+    for i in {4..36}
+    do
+      bash $LFS/sources/lfs/src/lfs3.sh $i
+    done
+    ;;
+esac
