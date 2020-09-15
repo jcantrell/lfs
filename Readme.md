@@ -1,10 +1,19 @@
 This project attempts to automate the Linux From Scratch project.
 Currently follows version 9.0 of LFS.
 
+Step 0: Prepare host system
+On tinycore linux:
+`wget http://jcantrell.me/jordan/files/preparesystem.sh`
+`wget http://jcantrell.me/jordan/files/setup.sh`
+`wget http://jcantrell.me/jordan/files/usecases.sh`
+`chmod +x {preparesystem,setup,usecases}.sh`
+`sh preparesystem.sh`
+`git clone http://jcantrell.me:3000/jcantrell/lfs.git`
+
 Step 1: Prepare the disk
 `# sudo bash lfs1.sh`
 Step 2: Prepare lfs user environment
-`$ git clone pi@10.0.0.133:/srv/git/lfs
+`$ git clone http://jcantrell.me:3000/jcantrell/lfs.git`
 `$ bash lfs/src/lfs2.sh`
 Step 3: Build temporary tools
 `$ time bash lfs/src/lfs3.sh`
