@@ -1,9 +1,9 @@
 # Chapter 5 - Constructing a Temporary System
 set -xe
 
-LP=~/lfs-build/logs
+LP=$LFS/sources/lfs/logs
 mkdir -p $LP
-TESTS="1"
+TESTS=""
 JOPT="-j `nproc`"
 #JOPT=""
 
@@ -419,10 +419,6 @@ ch5_35() {
   find /tools/{lib,libexec} -name \*.la -delete
 }
 
-ch5_36() {
-  su - root -c "chown -R root:root $LFS/tools"
-}
-
 #buildit
 # package,version,extension,chapter/section number
 bi() {
@@ -477,8 +473,7 @@ case "$1" in
   32) cs tar-1.32        .tar.xz 32 ;;
   33) cs texinfo-6.6     .tar.xz 33 ;;
   34) cs xz-5.2.4        .tar.xz 34 ;;
-  35) ch5_35 >$LP/5_35.log 2>$LP/5.35.err ;;
-  36) ch5_36 ;; # where to put this?
+  35) ch5_35 >$LP/5.35.log 2>$LP/5.35.err ;;
   *) 
     for i in {4..36}
     do

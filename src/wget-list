@@ -84,3 +84,6 @@ http://www.linuxfromscratch.org/patches/lfs/9.0/glibc-2.30-fhs-1.patch
 http://www.linuxfromscratch.org/patches/lfs/9.0/kbd-2.2.0-backspace-1.patch
 http://www.linuxfromscratch.org/patches/lfs/9.0/sysvinit-2.95-consolidated-1.patch
 http://www.linuxfromscratch.org/patches/lfs/9.0/systemd-241-networkd_and_rdrand_fixes-1.patch
+http://ftp.openbsd.org/pub/OpenBSD/OpenSSH/portable/openssh-8.0p1.tar.gz
+https://ftp.gnu.org/gnu/wget/wget-1.20.3.tar.gz
+https://roy.marples.name/downloads/dhcpcd/dhcpcd-8.0.3.tar.xz

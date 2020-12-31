@@ -1,4 +1,14 @@
-set -xe
+set -x
+LP="/sources/lfs/logs"
+# compile source
+bs() { # package, extension, chapternum
+  PK=$2; EXT=$3; NUM=$1;
+  tar -xf /sources/$PK$EXT
+  cd $PK
+  $NUM >$LP/$NUM.log 2>$LP/$NUM.err
+  cd ..
+  rm -rf $PK
+}
 
 ch6_35() {
   ./configure --prefix=/usr
@@ -553,33 +563,6 @@ for LIB in $save_usrlib; do
 done
 
 unset LIB save_lib save_usrlib
-exec /tools/bin/bash
-/tools/bin/find /usr/lib -type f -name \*.a \
-   -exec /tools/bin/strip --strip-debug {} ';'
-
-/tools/bin/find /lib /usr/lib -type f \( -name \*.so* -a ! -name \*dbg \) \
-   -exec /tools/bin/strip --strip-unneeded {} ';'
-
-/tools/bin/find /{bin,sbin} /usr/{bin,sbin,libexec} -type f \
-    -exec /tools/bin/strip --strip-all {} ';'
-}
-ch6_80() {
-rm -rf /tmp/*
-logout
-
-chroot "$LFS" /usr/bin/env -i          \
-    HOME=/root TERM="$TERM"            \
-    PS1='(lfs chroot) \u:\w\$ '        \
-    PATH=/bin:/usr/bin:/sbin:/usr/sbin \
-    /bin/bash --login
-
-rm -f /usr/lib/lib{bfd,opcodes}.a
-rm -f /usr/lib/libbz2.a
-rm -f /usr/lib/lib{com_err,e2p,ext2fs,ss}.a
-rm -f /usr/lib/libltdl.a
-rm -f /usr/lib/libfl.a
-rm -f /usr/lib/libz.a
-find /usr/lib /usr/libexec -name \*.la -delete
 }
 
 bs ch6_35 libtool-2.4.6   .tar.xz
@@ -626,4 +609,3 @@ bs ch6_75 sysklogd-1.5.1 .tar.gz
 bs ch6_76 sysvinit-2.95  .tar.xz
 bs ch6_77 eudev-3.2.8    .tar.gz
 ch6_79
-ch6_80

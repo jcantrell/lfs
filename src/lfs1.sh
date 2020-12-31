@@ -1,5 +1,7 @@
 set -xe
 # Preface: Checking host system requirements
+SYS="ubuntu"
+[ $SYS = "tinycore" ] && export PATH=/usr/local/sbin:$PATH
 
 cat > version-check.sh << "EOF"
 #!/bin/bash
@@ -60,7 +62,8 @@ rm -f dummy.c dummy
 EOF
 
 bash version-check.sh
-sed -e 's/\s*\([\+0-9a-zA-Z]*\).*/\1/' << EOF | fdisk /dev/sda
+DSK="sda"
+sed -e 's/\s*\([\+0-9a-zA-Z]*\).*/\1/' << EOF | fdisk /dev/$DSK
   n   # new partition
   p   # partition
   1   # first
@@ -80,26 +83,30 @@ sed -e 's/\s*\([\+0-9a-zA-Z]*\).*/\1/' << EOF | fdisk /dev/sda
 EOF
 
 # Chapter 2
-SWAPPART="/dev/sda1"
-LFSPART="/dev/sda2"
+SWAPPART="/dev/${DSK}1"
+LFSPART="/dev/${DSK}2"
 mkfs -v -t ext4 "$LFSPART"
 mkswap "$SWAPPART"
 
 export LFS=/mnt/lfs
 mkdir -pv $LFS
 mount -v -t ext4 "$LFSPART" $LFS
-/sbin/swapon -v "$SWAPPART"
+swapon -v "$SWAPPART"
 
 # Chapter 3 - Packages and Patches
 mkdir -v $LFS/sources
 chmod -v a+wt $LFS/sources
 
+wget http://jcantrell.me:3000/jcantrell/lfs/raw/master/src/wget-list-local
 wget --input-file=wget-list-local --continue --directory-prefix=$LFS/sources
 #mv $LFS/lfs-build/tarballs/* $LFS/sources
+git clone http://jcantrell.me:3000/jcantrell/lfs.git $LFS/sources/lfs
 
 # Place md5sums file in sources directory
 #wget wally/jordan/LFS7.7/md5sums
-cp md5sums $LFS/sources
+#cp md5sums $LFS/sources
+wget http://jcantrell.me:3000/jcantrell/lfs/raw/master/src/md5sums -P $LFS/sources
+bash version-check.sh >$LFS/sources/version-check.out
 
 pushd $LFS/sources
 md5sum -c md5sums
@@ -108,9 +115,16 @@ popd
 # Chapter 4 - Final Preparations
 mkdir -v $LFS/tools
 ln -sv $LFS/tools /
-groupadd lfs
-useradd -s /bin/bash -g lfs -m -k /dev/null lfs
-passwd lfs
+if [ "$SYS" = "tinycore" ]; then
+  # HACK: Why doesn't grep find this after 5.35?
+  ln -s /usr/local/lib/libpcre.so.1 /tools/lib/
+  addgroup lfs
+  adduser -s /bin/bash -G lfs -k /dev/null lfs
+else
+  groupadd lfs
+  useradd -s /bin/bash -g lfs -m -k /dev/null lfs
+  passwd lfs
+fi
 chown -v lfs $LFS/tools
-chown -v lfs $LFS/sources
+chown -vR lfs $LFS/sources
 su - lfs # make sure to run lfs2.sh as user lfs - could we pass the file to su?

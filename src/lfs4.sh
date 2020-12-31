@@ -1,5 +1,10 @@
 set -xe
 
+ch5_36() {
+  chown -R root:root $LFS/tools
+}
+
+
 ch6_2() {
   mkdir -pv $LFS/{dev,proc,sys,run}
   
@@ -18,4 +23,5 @@ ch6_2() {
   fi
 }
 
+ch5_36
 ch6_2

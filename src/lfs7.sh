@@ -1,4 +1,4 @@
-set -xe
+set -x
 set -o functrace
 
 LP="/sources/lfs/logs"
@@ -478,14 +478,13 @@ ch6_34() {
   su nobody -s /bin/bash -c "PATH=$PATH HOME=/home make tests"
   make install
   mv -vf /usr/bin/bash /bin
-  exec /bin/bash --login +h
 }
 
 
 # compile source
 bs() { # package, extension, chapternum
   PK=$2; EXT=$3; NUM=$1;
-  tar -xf $LFS/sources/$PK$EXT
+  tar -xf /sources/$PK$EXT
   cd $PK
   $NUM >$LP/$NUM.log 2>$LP/$NUM.err
   cd ..
@@ -521,5 +520,4 @@ bs ch6_30 iana-etc-2.30 .tar.bz2
 bs ch6_31 bison-3.4.1   .tar.xz
 bs ch6_32 flex-2.6.4    .tar.gz
 bs ch6_33 grep-3.3      .tar.xz
-# new shell started at end of ch6_34
 bs ch6_34 bash-5.0      .tar.gz
