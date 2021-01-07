@@ -1,5 +1,8 @@
 set -x
 LP="/sources/lfs/logs"
+mkdir -p $LP
+JOPT="-j `nproc`"
+
 # compile source
 bs() { # package, extension, chapternum
   PK=$2; EXT=$3; NUM=$1;
@@ -12,7 +15,7 @@ bs() { # package, extension, chapternum
 
 ch6_35() {
   ./configure --prefix=/usr
-  make
+  make $JOPT
   make check # TESTSUITEFLAGS=-j`nproc
   make install
 }
@@ -21,14 +24,14 @@ ch6_36() {
   ./configure --prefix=/usr    \
               --disable-static \
               --enable-libgdbm-compat
-  make
+  make $JOPT
   make check
   make install
 }
 
 ch6_37() {
   ./configure --prefix=/usr --docdir=/usr/share/doc/gperf-3.1
-  make
+  make $JOPT
   make -j1 check
   make install
 }
@@ -38,7 +41,7 @@ ch6_38() {
   ./configure --prefix=/usr    \
               --disable-static \
               --docdir=/usr/share/doc/expat-2.2.7
-  make
+  make $JOPT
   make check
   make install
   install -v -m644 doc/*.{html,png,css} /usr/share/doc/expat-2.2.7
@@ -54,7 +57,7 @@ ch6_39() {
               --disable-rlogin     \
               --disable-rsh        \
               --disable-servers
-  make
+  make $JOPT
   make check
   make install
   mv -v /usr/bin/{hostname,ping,ping6,traceroute} /bin
@@ -72,7 +75,7 @@ ch6_40() {
                     -Dpager="/usr/bin/less -isR"  \
                     -Duseshrplib                  \
                     -Dusethreads
-  make
+  make $JOPT
   make -k test
   make install
   unset BUILD_ZLIB BUILD_BZIP2
@@ -80,7 +83,7 @@ ch6_40() {
 
 ch6_41() {
   perl Makefile.PL
-  make
+  make $JOPT
   make test
   make install
 }
@@ -88,7 +91,7 @@ ch6_41() {
 ch6_42() {
   sed -i 's:\\\${:\\\$\\{:' intltool-update.in
   ./configure --prefix=/usr
-  make
+  make $JOPT
   make check
   make install
   install -v -Dm644 doc/I18N-HOWTO /usr/share/doc/intltool-0.51.0/I18N-HOWTO
@@ -97,14 +100,14 @@ ch6_42() {
 ch6_43() {
   sed '361 s/{/\\{/' -i bin/autoscan.in
   ./configure --prefix=/usr
-  make
+  make $JOPT
   make check
   make install
 }
 
 ch6_44() {
   ./configure --prefix=/usr --docdir=/usr/share/doc/automake-1.16.1
-  make
+  make $JOPT
   make -j4 check
   make install
 }
@@ -113,7 +116,7 @@ ch6_45() {
   ./configure --prefix=/usr    \
               --disable-static \
               --docdir=/usr/share/doc/xz-5.2.4
-  make
+  make $JOPT
   make check
   make install
   mv -v   /usr/bin/{lzma,unlzma,lzcat,xz,unxz,xzcat} /bin
@@ -128,7 +131,7 @@ ch6_46() {
               --with-rootlibdir=/lib \
               --with-xz              \
               --with-zlib
-  make
+  make $JOPT
   make install
   for target in depmod insmod lsmod modinfo modprobe rmmod; do
     ln -sfv ../bin/kmod /sbin/$target
@@ -140,7 +143,7 @@ ch6_47() {
   ./configure --prefix=/usr    \
               --disable-static \
               --docdir=/usr/share/doc/gettext-0.20.1
-  make
+  make $JOPT
   make check
   make install
   chmod -v 0755 /usr/lib/preloadable_libintl.so
@@ -148,7 +151,7 @@ ch6_47() {
 
 ch6_48() {
   ./configure --prefix=/usr
-  make
+  make $JOPT
   make check
   make -C libelf install
   install -vm644 config/libelf.pc /usr/lib/pkgconfig
@@ -162,7 +165,7 @@ ch6_49() {
       -e 's/^Cflags: -I${includedir}/Cflags:/' \
       -i libffi.pc.in
   ./configure --prefix=/usr --disable-static --with-gcc-arch=native
-  make
+  make $JOPT
   make check
   make install
 }
@@ -175,7 +178,7 @@ ch6_50() {
            --libdir=lib          \
            shared                \
            zlib-dynamic
-  make
+  make $JOPT
   make test
   sed -i '/INSTALL_LIBS/s/libcrypto.a libssl.a//' Makefile
   make MANSUFFIX=ssl install
@@ -189,7 +192,7 @@ ch6_51() {
               --with-system-expat \
               --with-system-ffi   \
               --with-ensurepip=yes
-  make
+  make $JOPT
   make install
   chmod -v 755 /usr/lib/libpython3.7m.so
   chmod -v 755 /usr/lib/libpython3.so
@@ -228,7 +231,7 @@ ch6_54() {
   FORCE_UNSAFE_CONFIGURE=1 ./configure \
               --prefix=/usr            \
               --enable-no-install-program=kill,uptime
-  make
+  make $JOPT
   make NON_ROOT_USERNAME=nobody check-root
   echo "dummy:x:1000:nobody" >> /etc/group
   chown -Rv nobody . 
@@ -248,7 +251,7 @@ ch6_54() {
 
 ch6_55() {
   ./configure --prefix=/usr
-  make
+  make $JOPT
   make check
   make docdir=/usr/share/doc/check-0.12.0 install
   sed -i '1 s/tools/usr/' /usr/bin/checkmk
@@ -256,7 +259,7 @@ ch6_55() {
 
 ch6_56() {
   ./configure --prefix=/usr
-  make
+  make $JOPT
   make check
   make install
 }
@@ -264,7 +267,7 @@ ch6_56() {
 ch6_57() {
   sed -i 's/extras//' Makefile.in
   ./configure --prefix=/usr
-  make
+  make $JOPT
   make check
   make install
   mkdir -v /usr/share/doc/gawk-5.0.1
@@ -277,7 +280,7 @@ ch6_58() {
   sed -i '/unistd/a #include <sys/sysmacros.h>' gl/lib/mountlist.c
   echo "#define _IO_IN_BACKUP 0x100" >> gl/lib/stdio-impl.h
   ./configure --prefix=/usr --localstatedir=/var/lib/locate
-  make
+  make $JOPT
   make check
   make install
   mv -v /usr/bin/find /bin
@@ -296,20 +299,20 @@ ch6_60() {
               --sysconfdir=/etc      \
               --disable-efiemu       \
               --disable-werror
-  make
+  make $JOPT
   make install
   mv -v /etc/bash_completion.d/grub /usr/share/bash-completion/completions
 }
 
 ch6_61() {
   ./configure --prefix=/usr --sysconfdir=/etc
-  make
+  make $JOPT
   make install
 }
 
 ch6_62() {
   ./configure --prefix=/usr
-  make
+  make $JOPT
   make check
   make install
   mv -v /usr/bin/gzip /bin
@@ -319,7 +322,7 @@ ch6_63() {
   sed -i /ARPD/d Makefile
   rm -fv man/man8/arpd.8
   sed -i 's/.m_ipt.o//' tc/Makefile
-  make
+  make $JOPT
   make DOCDIR=/usr/share/doc/iproute2-5.2.0 install
 }
 
@@ -328,7 +331,7 @@ ch6_64() {
   sed -i 's/\(RESIZECONS_PROGS=\)yes/\1no/g' configure
   sed -i 's/resizecons.8 //' docs/man/man8/Makefile.in
   PKG_CONFIG_PATH=/tools/lib/pkgconfig ./configure --prefix=/usr --disable-vlock
-  make
+  make $JOPT
   make check
   make install
   mkdir -v       /usr/share/doc/kbd-2.2.0
@@ -337,7 +340,7 @@ ch6_64() {
 
 ch6_65() {
   ./configure --prefix=/usr
-  make
+  make $JOPT
   make check
   make install
 }
@@ -345,14 +348,14 @@ ch6_65() {
 ch6_66() {
   sed -i '211,217 d; 219,229 d; 232 d' glob/glob.c
   ./configure --prefix=/usr
-  make
+  make $JOPT
   make PERL5LIB=$PWD/tests/ check
   make install
 }
 
 ch6_67() {
   ./configure --prefix=/usr
-  make
+  make $JOPT
   make check
   make install
 }
@@ -368,7 +371,7 @@ ch6_68() {
               --with-grap=/usr/bin/grap            \
               --with-systemdtmpfilesdir=           \
               --with-systemdsystemunitdir=
-  make
+  make $JOPT
   make check
   make install
 }
@@ -377,7 +380,7 @@ ch6_69() {
   FORCE_UNSAFE_CONFIGURE=1  \
   ./configure --prefix=/usr \
               --bindir=/bin
-  make
+  make $JOPT
   make check
   make install
   make -C doc install-html docdir=/usr/share/doc/tar-1.32
@@ -385,7 +388,7 @@ ch6_69() {
 
 ch6_70() {
   ./configure --prefix=/usr --disable-static
-  make
+  make $JOPT
   make check
   make install
   make TEXMF=/usr/share/texmf install-tex
@@ -400,7 +403,7 @@ ch6_70() {
 ch6_71() {
   echo '#define SYS_VIMRC_FILE "/etc/vimrc"' >> src/feature.h
   ./configure --prefix=/usr
-  make
+  make $JOPT
   chown -Rv nobody .
   su nobody -s /bin/bash -c "LANG=en_US.UTF-8 make -j1 test" &> vim-test.log
   make install
@@ -435,7 +438,7 @@ ch6_72() {
               --docdir=/usr/share/doc/procps-ng-3.3.15 \
               --disable-static                         \
               --disable-kill
-  make
+  make $JOPT
   sed -i -r 's|(pmap_initname)\\\$|\1|' testsuite/pmap.test/pmap.exp
   sed -i '/set tty/d' testsuite/pkill.test/pkill.exp
   rm testsuite/pgrep.test/pgrep.exp
@@ -460,7 +463,7 @@ ch6_73() {
               --without-python     \
               --without-systemd    \
               --without-systemdsystemunitdir
-  make
+  make $JOPT
   
   
   chown -Rv nobody .
@@ -480,7 +483,7 @@ ch6_74() {
                --disable-libuuid       \
                --disable-uuidd         \
                --disable-fsck
-  make
+  make $JOPT
   make check
   make install
   make install-libs
@@ -496,7 +499,7 @@ ch6_74() {
 ch6_75() {
   sed -i '/Error loading kernel symbols/{n;n;d}' ksym_mod.c
   sed -i 's/union wait/int/' syslogd.c
-  make
+  make $JOPT
   make BINDIR=/sbin install
 cat > /etc/syslog.conf << "EOF"
 # Begin /etc/syslog.conf
@@ -515,7 +518,7 @@ EOF
 
 ch6_76() {
   patch -Np1 -i ../sysvinit-2.95-consolidated-1.patch
-  make
+  make $JOPT
   make install
 }
 
@@ -530,7 +533,7 @@ ch6_77() {
               --with-rootlibdir=/lib  \
               --enable-manpages       \
               --disable-static
-  make
+  make $JOPT
   mkdir -pv /lib/udev/rules.d
   mkdir -pv /etc/udev/rules.d
   make check

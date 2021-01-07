@@ -1,4 +1,8 @@
 #!/bin/bash
+set -x
+DSK=sda
+LFSPART=${DSK}2
+SWAPPART=${DSK}1
 
 ch6_80_1() {
   rm -f /usr/lib/lib{bfd,opcodes}.a
@@ -157,14 +161,14 @@ EOF
 }
 
 ch8_2() {
-cat > /etc/fstab << "EOF"
+cat > /etc/fstab << EOF
 # Begin /etc/fstab
 
 # file system  mount-point  type     options             dump  fsck
 #                                                              order
 
-/dev/sda1     /            ext4    defaults            1     1
-/dev/sda2     swap         swap     pri=1               0     0
+/dev/${LFSPART}       /            ext4    defaults            1     1
+/dev/${SWAPPART}     swap         swap     pri=1               0     0
 proc           /proc        proc     nosuid,noexec,nodev 0     0
 sysfs          /sys         sysfs    nosuid,noexec,nodev 0     0
 devpts         /dev/pts     devpts   gid=5,mode=620      0     0
@@ -304,16 +308,21 @@ rm -rf $PK
   #logout
 }
 
-ch6_80_1
-ch7_2
-ch7_4
-ch7_5
-ch7_6
-ch7_7
-ch7_8
-ch7_9
-ch8_2
-ch8_3
-ch8_4
-ch9_1
-ch9_3
+
+if [ "$1" = "" ]; then
+  ch6_80_1
+  ch7_2
+  ch7_4
+  ch7_5
+  ch7_6
+  ch7_7
+  ch7_8
+  ch7_9
+  ch8_2
+  ch8_3
+  ch8_4
+  ch9_1
+  ch9_3
+else
+  $1
+fi

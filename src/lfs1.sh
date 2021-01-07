@@ -1,7 +1,10 @@
 set -xe
 # Preface: Checking host system requirements
 SYS="ubuntu"
+[ ! -z "$1" ] && SYS="$1"
 [ $SYS = "tinycore" ] && export PATH=/usr/local/sbin:$PATH
+DSK="sda"
+[ ! -z "$2" ] && DSK="$2"
 
 cat > version-check.sh << "EOF"
 #!/bin/bash
@@ -62,7 +65,6 @@ rm -f dummy.c dummy
 EOF
 
 bash version-check.sh
-DSK="sda"
 sed -e 's/\s*\([\+0-9a-zA-Z]*\).*/\1/' << EOF | fdisk /dev/$DSK
   n   # new partition
   p   # partition
@@ -106,7 +108,7 @@ git clone http://jcantrell.me:3000/jcantrell/lfs.git $LFS/sources/lfs
 #wget wally/jordan/LFS7.7/md5sums
 #cp md5sums $LFS/sources
 wget http://jcantrell.me:3000/jcantrell/lfs/raw/master/src/md5sums -P $LFS/sources
-bash version-check.sh >$LFS/sources/version-check.out
+bash version-check.sh >$LFS/sources/version-check.out 2>&1
 
 pushd $LFS/sources
 md5sum -c md5sums
@@ -127,4 +129,4 @@ else
 fi
 chown -v lfs $LFS/tools
 chown -vR lfs $LFS/sources
-su - lfs # make sure to run lfs2.sh as user lfs - could we pass the file to su?
+su - lfs --whitelist-environment=LFS # make sure to run lfs2.sh as user lfs - could we pass the file to su?
