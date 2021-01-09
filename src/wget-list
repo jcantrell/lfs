@@ -87,3 +87,4 @@ http://www.linuxfromscratch.org/patches/lfs/9.0/systemd-241-networkd_and_rdrand_
 http://ftp.openbsd.org/pub/OpenBSD/OpenSSH/portable/openssh-8.0p1.tar.gz
 https://ftp.gnu.org/gnu/wget/wget-1.20.3.tar.gz
 https://roy.marples.name/downloads/dhcpcd/dhcpcd-8.0.3.tar.xz
+http://anduin.linuxfromscratch.org/BLFS/blfs-bootscripts/blfs-bootscripts-20190609.tar.xz
