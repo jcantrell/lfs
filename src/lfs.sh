@@ -1,5 +1,5 @@
 #!/bin/bash
-set -xe
+set -x
 SYS="ubuntu" # or ubuntu
 [ ! -z "$2" ] && SYS="$2"
 DSK="sda"
@@ -10,7 +10,7 @@ DSK2="2"
 [ ! -z "$5" ] && DSK2="$5"
 SWAPPART=/dev/"${DSK}${DSK1}"
 LFSPART=/dev/"${DSK}${DSK2}"
-BRANCH="onefile"
+BRANCH="master"
 LP=$LFS/sources/lfs/logs
 mkdir -p $LP
 TESTS=""
@@ -113,9 +113,9 @@ export LFS=/mnt/lfs
 }
 
 ch2_7() {
-mkdir -pv $LFS
-mount -v -t ext4 "$LFSPART" $LFS
-swapon -v "$SWAPPART"
+  mkdir -pv $LFS
+  mount -v -t ext4 "$LFSPART" $LFS
+  swapon -v "$SWAPPART"
 }
 
 # Chapter 3 - Packages and Patches
@@ -138,29 +138,31 @@ ch3_1() {
 
 # Chapter 4 - Final Preparations
 ch4_2() {
-mkdir -v $LFS/tools
-ln -sv $LFS/tools /
+  mkdir -pv $LFS/{bin,etc,lib,sbin,usr,var}
+  case $(uname -m) in
+    x86_64) mkdir -pv $LFS/lib64 ;;
+  esac
+  mkdir -v $LFS/tools
 }
 
-ch4_3_1() {
-if [ "$SYS" = "tinycore" ]; then
-  # HACK: Why doesn't grep find this after 5.35?
-  ln -s /usr/local/lib/libpcre.so.1 /tools/lib/
-  addgroup lfs
-  adduser -s /bin/bash -G lfs -k /dev/null lfs
-else
-  groupadd lfs
-  useradd -s /bin/bash -g lfs -m -k /dev/null lfs
-  #passwd lfs
-  echo lfs:lfspassword | chpasswd
-fi
-chown -v lfs $LFS/tools
-chown -vR lfs $LFS/sources
-}
-
-ch4_3_2() {
-# make sure to run lfs2.sh as user lfs - could we pass the file to su?
-su - lfs --whitelist-environment=LFS
+ch4_3() {
+  if [ "$SYS" = "tinycore" ]; then
+    # HACK: Why doesn't grep find this after 5.35?
+    ln -s /usr/local/lib/libpcre.so.1 /tools/lib/
+    addgroup lfs
+    adduser -s /bin/bash -G lfs -k /dev/null lfs
+  else
+    groupadd lfs
+    useradd -s /bin/bash -g lfs -m -k /dev/null lfs
+    #passwd lfs
+    echo lfs:lfspassword | chpasswd
+  fi
+  chown -v lfs $LFS/{usr,lib,var,etc,bin,sbin,tools}
+  case  $(uname -m) in
+    x86_64) chown -v lfs $LFS/lib64 ;;
+  esac
+  chown -vR lfs $LFS/sources
+  su - lfs --whitelist-environment=LFS
 }
 
 ch4_4() {
@@ -175,7 +177,9 @@ umask 022
 LFS=/mnt/lfs
 LC_ALL=POSIX
 LFS_TGT=$(uname -m)-lfs-linux-gnu
-PATH=/tools/bin:/bin:/usr/bin
+PATH=/usr/bin
+if [ ! -L /bin ]; then PATH=/bin:$PATH; fi
+PATH=$LFS/tools/bin:$PATH
 export LFS LC_ALL LFS_TGT PATH
 EOF
 
@@ -186,49 +190,27 @@ EOF
 source ~/.bash_profile
 }
 
-ch5_4() {
+ch5_2() {
   mkdir -v build
   cd build
-
-  ../configure --prefix=/tools            \
-                             --with-sysroot=$LFS        \
-                             --with-lib-path=/tools/lib \
-                             --target=$LFS_TGT          \
-                             --disable-nls              \
-                             --disable-werror
-
+  ../configure --prefix=$LFS/tools        \
+               --with-sysroot=$LFS        \
+               --target=$LFS_TGT          \
+               --disable-nls              \
+               --disable-werror
   make $JOPT
-
-  case $(uname -m) in
-    x86_64) mkdir -v /tools/lib && ln -sv lib /tools/lib64 ;;
-  esac
-
   make install
-
   cd ..
 }
 
-ch5_5() {
-  tar -xf ../mpfr-4.0.2.tar.xz
-  mv -v mpfr-4.0.2 mpfr
-  tar -xf ../gmp-6.1.2.tar.xz
-  mv -v gmp-6.1.2 gmp
+ch5_3() {
+  tar -xf ../mpfr-4.1.0.tar.xz
+  mv -v mpfr-4.1.0 mpfr
+  tar -xf ../gmp-6.2.0.tar.xz
+  mv -v gmp-6.2.0 gmp
   tar -xf ../mpc-1.1.0.tar.gz
   mv -v mpc-1.1.0 mpc
   
-  for file in gcc/config/{linux,i386/linux{,64}}.h
-  do
-    cp -uv $file{,.orig}
-    sed -e 's@/lib\(64\)\?\(32\)\?/ld@/tools&@g' \
-        -e 's@/usr@/tools@g' $file.orig > $file
-    echo '
-  #undef STANDARD_STARTFILE_PREFIX_1
-  #undef STANDARD_STARTFILE_PREFIX_2
-  #define STANDARD_STARTFILE_PREFIX_1 "/tools/lib/"
-  #define STANDARD_STARTFILE_PREFIX_2 ""' >> $file
-    touch $file.orig
-  done
-
   case $(uname -m) in
     x86_64)
       sed -e '/m64=/s/lib64/lib/' -i.orig gcc/config/i386/t-linux64
@@ -238,115 +220,272 @@ ch5_5() {
   mkdir -v build
   cd build
   
-  ../configure                                         \
-      --target=$LFS_TGT                                \
-      --prefix=/tools                                  \
-      --with-glibc-version=2.11                        \
-      --with-sysroot=$LFS                              \
-      --with-newlib                                    \
-      --without-headers                                \
-      --with-local-prefix=/tools                       \
-      --with-native-system-header-dir=/tools/include   \
-      --disable-nls                                    \
-      --disable-shared                                 \
-      --disable-multilib                               \
-      --disable-decimal-float                          \
-      --disable-threads                                \
-      --disable-libatomic                              \
-      --disable-libgomp                                \
-      --disable-libquadmath                            \
-      --disable-libssp                                 \
-      --disable-libvtv                                 \
-      --disable-libstdcxx                              \
+  ../configure                                       \
+      --target=$LFS_TGT                              \
+      --prefix=$LFS/tools                            \
+      --with-glibc-version=2.11                      \
+      --with-sysroot=$LFS                            \
+      --with-newlib                                  \
+      --without-headers                              \
+      --enable-initfini-array                        \
+      --disable-nls                                  \
+      --disable-shared                               \
+      --disable-multilib                             \
+      --disable-decimal-float                        \
+      --disable-threads                              \
+      --disable-libatomic                            \
+      --disable-libgomp                              \
+      --disable-libquadmath                          \
+      --disable-libssp                               \
+      --disable-libvtv                               \
+      --disable-libstdcxx                            \
       --enable-languages=c,c++
   
   make $JOPT
-  
   make install
-
   cd ..
+  cat gcc/limitx.h gcc/glimits.h gcc/limity.h > \
+    `dirname $($LFS_TGT-gcc -print-libgcc-file-name)`/install-tools/include/limits.h
 }
 
-ch5_6() {
+ch5_4() {
   make mrproper
-  make INSTALL_HDR_PATH=dest headers_install
-  cp -rv dest/include/* /tools/include
+  make headers
+  find usr/include -name '.*' -delete
+  rm usr/include/Makefile
+  cp -rv usr/include $LFS/usr
 }
 
-ch5_7() {
+ch5_5() {
+  case $(uname -m) in
+    i?86)   ln -sfv ld-linux.so.2 $LFS/lib/ld-lsb.so.3
+    ;;
+    x86_64) ln -sfv ../lib/ld-linux-x86-64.so.2 $LFS/lib64
+            ln -sfv ../lib/ld-linux-x86-64.so.2 $LFS/lib64/ld-lsb-x86-64.so.3
+    ;;
+  esac
+  patch -Np1 -i ../glibc-2.32-fhs-1.patch
+
   mkdir -v build
   cd build
   ../configure                                        \
-        --prefix=/tools                               \
+        --prefix=/usr                                 \
         --host=$LFS_TGT                               \
         --build=$(../scripts/config.guess)            \
         --enable-kernel=3.2                           \
-        --with-headers=/tools/include                 
+        --with-headers=$LFS/usr/include               \
+        libc_cv_slibdir=/lib
   make $JOPT
-  make install
+  make DESTDIR=$LFS install
    # Now test to make sure we compile correctly
   echo 'int main(){}' > dummy.c
   $LFS_TGT-gcc dummy.c
-  readelf -l a.out | grep ': /tools'
+  readelf -l a.out | grep '/ld-linux'
   rm -v dummy.c a.out
   cd ..
+  $LFS/tools/libexec/gcc/$LFS_TGT/10.2.0/install-tools/mkheaders
 }
 
-ch5_8() {
+ch5_6() {
   mkdir -v build
   cd build
-  ../libstdc++-v3/configure           \
+  ../libstdc++-v3/configure         \
     --host=$LFS_TGT                 \
-    --prefix=/tools                 \
+    --build=$(../config.guess)      \
+    --prefix=/usr                   \
     --disable-multilib              \
     --disable-nls                   \
-    --disable-libstdcxx-threads     \
     --disable-libstdcxx-pch         \
-    --with-gxx-include-dir=/tools/$LFS_TGT/include/c++/9.2.0
+    --with-gxx-include-dir=/tools/$LFS_TGT/include/c++/10.2.0
   make $JOPT
-  make install
+  make DESTDIR=$LFS install
   cd ..
 }
 
-ch5_9() {
+ch6_2() {
+  sed -i 's/IO_ftrylockfile/IO_EOF_SEEN/' lib/*.c
+  echo "#define _IO_IN_BACKUP 0x100" >> lib/stdio-impl.h
+  ./configure --prefix=/usr \
+              --host=$LFS_TGT \
+              --build=$(build-aux/config.guess)
+  make $JOPT
+  make DESTDIR=$LFS install
+}
+
+ch6_3() {
+  sed -i s/mawk// configure
+  mkdir build
+  pushd build
+    ../configure
+    make -C include
+    make -C progs tic
+  popd
+  ./configure --prefix=/usr                \
+              --host=$LFS_TGT              \
+              --build=$(./config.guess)    \
+              --mandir=/usr/share/man      \
+              --with-manpage-format=normal \
+              --with-shared                \
+              --without-debug              \
+              --without-ada                \
+              --without-normal             \
+              --enable-widec
+  
+  make $JOPT
+  make DESTDIR=$LFS TIC_PATH=$(pwd)/build/progs/tic install
+  echo "INPUT(-lncursesw)" > $LFS/usr/lib/libncurses.so
+  mv -v $LFS/usr/lib/libncursesw.so.6* $LFS/lib
+  ln -sfv ../../lib/$(readlink $LFS/usr/lib/libncursesw.so) $LFS/usr/lib/libncursesw.so
+}
+
+ch6_4() {
+  ./configure --prefix=/usr                   \
+              --build=$(support/config.guess) \
+              --host=$LFS_TGT                 \
+              --without-bash-malloc
+  make
+  make DESTDIR=$LFS install
+  mv $LFS/usr/bin/bash $LFS/bin/bash
+  ln -sv bash $LFS/bin/sh
+}
+
+ch6_5() {
+  ./configure --prefix=/usr                     \
+              --host=$LFS_TGT                   \
+              --build=$(build-aux/config.guess) \
+              --enable-install-program=hostname \
+              --enable-no-install-program=kill,uptime
+  make $JOPT
+  make DESTDIR=$LFS install
+  mv -v $LFS/usr/bin/{cat,chgrp,chmod,chown,cp,date,dd,df,echo} $LFS/bin
+  mv -v $LFS/usr/bin/{false,ln,ls,mkdir,mknod,mv,pwd,rm}        $LFS/bin
+  mv -v $LFS/usr/bin/{rmdir,stty,sync,true,uname}               $LFS/bin
+  mv -v $LFS/usr/bin/{head,nice,sleep,touch}                    $LFS/bin
+  mv -v $LFS/usr/bin/chroot                                     $LFS/usr/sbin
+  mkdir -pv $LFS/usr/share/man/man8
+  mv -v $LFS/usr/share/man/man1/chroot.1                        $LFS/usr/share/man/man8/chroot.8
+  sed -i 's/"1"/"8"/'                                           $LFS/usr/share/man/man8/chroot.8
+}
+
+ch6_6() {
+  ./configure --prefix=/usr --host=$LFS_TGT
+  make $JOPT
+  make DESTDIR=$LFS install
+}
+
+ch6_7() {
+  ./configure --prefix=/usr --host=$LFS_TGT
+  make $JOPT
+  make DESTDIR=$LFS install
+}
+
+ch6_8() {
+  ./configure --prefix=/usr   \
+              --host=$LFS_TGT \
+              --build=$(build-aux/config.guess)
+  make $JOPT
+  make DESTDIR=$LFS install
+  mv -v $LFS/usr/bin/find $LFS/bin
+  sed -i 's|find:=${BINDIR}|find:=/bin|' $LFS/usr/bin/updatedb
+}
+
+ch6_9() {
+  sed -i 's/extras//' Makefile.in
+  ./configure --prefix=/usr   \
+              --host=$LFS_TGT \
+              --build=$(./config.guess)
+  make $JOPT
+  make DESTDIR=$LFS install
+}
+
+ch6_10() {
+  ./configure --prefix=/usr   \
+              --host=$LFS_TGT \
+              --bindir=/bin
+  make $JOPT
+  make DESTDIR=$LFS install
+}
+
+ch6_11() {
+  ./configure --prefix=/usr --host=$LFS_TGT
+  make
+  make DESTDIR=$LFS install
+  mv -v $LFS/usr/bin/gzip $LFS/bin
+}
+
+ch6_12() {
+  ./configure --prefix=/usr   \
+              --without-guile \
+              --host=$LFS_TGT \
+              --build=$(build-aux/config.guess)
+
+  make $JOPT
+  make DESTDIR=$LFS install
+}
+
+ch6_13() {
+  ./configure --prefix=/usr   \
+              --host=$LFS_TGT \
+              --build=$(build-aux/config.guess)
+  make $JOPT
+  make DESTDIR=$LFS install
+}
+
+ch6_14() {
+  ./configure --prefix=/usr   \
+              --host=$LFS_TGT \
+              --bindir=/bin
+  make $JOPT
+  make DESTDIR=$LFS install
+}
+
+ch6_15() {
+  ./configure --prefix=/usr                     \
+              --host=$LFS_TGT                   \
+              --build=$(build-aux/config.guess) \
+              --bindir=/bin
+  make $JOPT
+  make DESTDIR=$LFS install
+}
+
+ch6_16() {
+  ./configure --prefix=/usr                     \
+              --host=$LFS_TGT                   \
+              --build=$(build-aux/config.guess) \
+              --disable-static                  \
+              --docdir=/usr/share/doc/xz-5.2.5
+  make $JOPT
+  make DESTDIR=$LFS install
+  mv -v $LFS/usr/bin/{lzma,unlzma,lzcat,xz,unxz,xzcat}  $LFS/bin
+  mv -v $LFS/usr/lib/liblzma.so.*                       $LFS/lib
+  ln -svf ../../lib/$(readlink $LFS/usr/lib/liblzma.so) $LFS/usr/lib/liblzma.so
+}
+
+ch6_17() {
   mkdir -v build
   cd build
   
-  CC=$LFS_TGT-gcc                \
-  AR=$LFS_TGT-ar                 \
-  RANLIB=$LFS_TGT-ranlib         \
-  ../configure     \
-      --prefix=/tools            \
-      --disable-nls              \
-      --disable-werror           \
-      --with-lib-path=/tools/lib \
-      --with-sysroot
-  
+../configure                   \
+    --prefix=/usr              \
+    --build=$(../config.guess) \
+    --host=$LFS_TGT            \
+    --disable-nls              \
+    --enable-shared            \
+    --disable-werror           \
+    --enable-64-bit-bfd
   make $JOPT
-  make install
-  make -C ld clean
-  make -C ld LIB_PATH=/usr/lib:/lib
-  cp -v ld/ld-new /tools/bin
-
+  make DESTDIR=$LFS install
   cd ..
 }
 
-ch5_10() {
-  cat gcc/limitx.h gcc/glimits.h gcc/limity.h > \
-    `dirname $($LFS_TGT-gcc -print-libgcc-file-name)`/include-fixed/limits.h
-  for file in gcc/config/{linux,i386/linux{,64}}.h
-  do
-    cp -uv $file{,.orig}
-    sed -e 's@/lib\(64\)\?\(32\)\?/ld@/tools&@g' \
-        -e 's@/usr@/tools@g' $file.orig > $file
-    echo '
-  #undef STANDARD_STARTFILE_PREFIX_1
-  #undef STANDARD_STARTFILE_PREFIX_2
-  #define STANDARD_STARTFILE_PREFIX_1 "/tools/lib/"
-  #define STANDARD_STARTFILE_PREFIX_2 ""' >> $file
-    touch $file.orig
-  done
-
+ch6_18() {
+  tar -xf ../mpfr-4.1.0.tar.xz
+  mv -v mpfr-4.1.0 mpfr
+  tar -xf ../gmp-6.2.0.tar.xz
+  mv -v gmp-6.2.0 gmp
+  tar -xf ../mpc-1.1.0.tar.gz
+  mv -v mpc-1.1.0 mpc
+  
   case $(uname -m) in
     x86_64)
       sed -e '/m64=/s/lib64/lib/' \
@@ -354,260 +493,51 @@ ch5_10() {
     ;;
   esac
 
-  tar -xf ../mpfr-4.0.2.tar.xz
-  mv -v mpfr-4.0.2 mpfr
-  tar -xf ../gmp-6.1.2.tar.xz
-  mv -v gmp-6.1.2 gmp
-  tar -xf ../mpc-1.1.0.tar.gz
-  mv -v mpc-1.1.0 mpc
-  
   mkdir -v build
   cd build
   
-  CC=$LFS_TGT-gcc                                      \
-  CXX=$LFS_TGT-g++                                     \
-  AR=$LFS_TGT-ar                                       \
-  RANLIB=$LFS_TGT-ranlib                               \
-  ../configure                               \
-      --prefix=/tools                                  \
-      --with-local-prefix=/tools                       \
-      --with-native-system-header-dir=/tools/include   \
-      --enable-languages=c,c++                         \
-      --disable-libstdcxx-pch                          \
-      --disable-multilib                               \
-      --disable-bootstrap                              \
-      --disable-libgomp
-  
+  mkdir -pv $LFS_TGT/libgcc
+  ln -s ../../../libgcc/gthr-posix.h $LFS_TGT/libgcc/gthr-default.h
+  ../configure                                       \
+      --build=$(../config.guess)                     \
+      --host=$LFS_TGT                                \
+      --prefix=/usr                                  \
+      CC_FOR_TARGET=$LFS_TGT-gcc                     \
+      --with-build-sysroot=$LFS                      \
+      --enable-initfini-array                        \
+      --disable-nls                                  \
+      --disable-multilib                             \
+      --disable-decimal-float                        \
+      --disable-libatomic                            \
+      --disable-libgomp                              \
+      --disable-libquadmath                          \
+      --disable-libssp                               \
+      --disable-libvtv                               \
+      --disable-libstdcxx                            \
+      --enable-languages=c,c++
   make $JOPT
-  make install
-  ln -sv gcc /tools/bin/cc
+  make DESTDIR=$LFS install
+  ln -sv gcc $LFS/usr/bin/cc
   
-  echo 'int main(){}' > dummy.c
-  cc dummy.c
-  readelf -l a.out | grep ': /tools'
-  rm -v dummy.c a.out
   cd ..
 }
 
-ch5_11() {
-  cd unix
-  ./configure --prefix=/tools
-  
-  make $JOPT
-  
-  TZ=UTC make test
-  
-  make install
-  chmod -v u+w /tools/lib/libtcl8.6.so
-  make install-private-headers
-  ln -sv tclsh8.6 /tools/bin/tclsh
-
-  cd ..
+ch7_2() {
+  chown -R root:root $LFS/{usr,lib,var,etc,bin,sbin,tools}
+  case $(uname -m) in
+    x86_64) chown -R root:root $LFS/lib64 ;;
+  esac
 }
 
-ch5_12() {
-  cp -v configure{,.orig}
-  sed 's:/usr/local/bin:/bin:' configure.orig > configure
-  
-  ./configure --prefix=/tools       \
-              --with-tcl=/tools/lib \
-              --with-tclinclude=/tools/include
-  
-  make $JOPT
-  
-  [ ! -z $TESTS ] && make test
-  
-  make SCRIPTS="" install
-}
-
-ch5_13() {
-  ./configure --prefix=/tools
-  make install
-  if [ ! -z $TESTS ]; then make check; fi
-}
-
-ch5_14() {
-  sed -i 's/IO_ftrylockfile/IO_EOF_SEEN/' lib/*.c
-  echo "#define _IO_IN_BACKUP 0x100" >> lib/stdio-impl.h
-  ./configure --prefix=/tools
-  make $JOPT
-  
-  [ ! -z $TESTS ] && make check
-  make install
-}
-
-ch5_15() {
-  sed -i s/mawk// configure
-  ./configure --prefix=/tools \
-              --with-shared   \
-              --without-debug \
-              --without-ada   \
-              --enable-widec  \
-              --enable-overwrite
-  
-  make $JOPT
-  make install
-  ln -s libncursesw.so /tools/lib/libncurses.so
-}
-
-ch5_16() {
-  ./configure --prefix=/tools --without-bash-malloc
-  make $JOPT
-  [ ! -z $TESTS ] && make tests
-  make install
-  ln -sv bash /tools/bin/sh
-}
-
-ch5_17() {
-  ./configure --prefix=/tools
-  make $JOPT
-  [ ! -z $TESTS ] && make check
-  make install
-}
-
-ch5_18() {
-  make $JOPT
-  make PREFIX=/tools install
-}
-
-ch5_19() {
-  ./configure --prefix=/tools --enable-install-program=hostname
-  make $JOPT
-  [ ! -z $TESTS ] && make RUN_EXPENSIVE_TESTS=yes check
-  make install
-}
-
-ch5_20() {
-  ./configure --prefix=/tools
-  make $JOPT
-  [ ! -z $TESTS ] && make check
-  make install
-}
-
-ch5_21() {
-  ./configure --prefix=/tools
-  make $JOPT
-  [ ! -z $TESTS ] && make check
-  make install
-}
-
-ch5_22() {
-  sed -i 's/IO_ftrylockfile/IO_EOF_SEEN/' gl/lib/*.c
-  sed -i '/unistd/a #include <sys/sysmacros.h>' gl/lib/mountlist.c
-  echo "#define _IO_IN_BACKUP 0x100" >> gl/lib/stdio-impl.h
-  ./configure --prefix=/tools
-  make $JOPT
-  [ ! -z $TESTS ] && make check
-  make install
-}
-
-ch5_23() {
-  ./configure --prefix=/tools
-  make $JOPT
-  [ ! -z $TESTS ] && make check
-  make install
-}
-
-ch5_24() {
-  ./configure --disable-shared
-  make $JOPT
-  cp -v gettext-tools/src/{msgfmt,msgmerge,xgettext} /tools/bin
-}
-
-ch5_25() {
-  ./configure --prefix=/tools
-  make $JOPT
-  [ ! -z $TESTS ] && make check
-  make install
-}
-
-ch5_26() {
-  ./configure --prefix=/tools
-  make $JOPT
-  [ ! -z $TESTS ] && make check
-  make install
-}
-
-ch5_27() {
-  sed -i '211,217 d; 219,229 d; 232 d' glob/glob.c
-  ./configure --prefix=/tools --without-guile
-  make $JOPT
-  [ ! -z $TESTS ] && make check
-  make install
-}
-
-ch5_28() {
-  ./configure --prefix=/tools
-  make $JOPT
-  [ ! -z $TESTS ] && make check
-  make install
-}
-
-ch5_29() {
-  sh Configure -des -Dprefix=/tools -Dlibs=-lm -Uloclibpth -Ulocincpth
-  
-  make $JOPT
-  
-  cp -v perl cpan/podlators/scripts/pod2man /tools/bin
-  mkdir -pv /tools/lib/perl5/5.30.0
-  cp -Rv lib/* /tools/lib/perl5/5.30.0
-}
-
-ch5_30() {
-  sed -i '/def add_multiarch_paths/a \        return' setup.py
-  ./configure --prefix=/tools --without-ensurepip
-  make $JOPT
-  make install
-}
-
-ch5_31() {
-  ./configure --prefix=/tools
-  make $JOPT
-  [ ! -z $TESTS ] && make check
-  make install
-}
-
-ch5_32() {
-  ./configure -prefix=/tools
-  make $JOPT
-  [ ! -z $TESTS ] && make check
-  make install
-}
-
-ch5_33() {
-  ./configure --prefix=/tools
-  make $JOPT
-  [ ! -z $TESTS ] && make check
-  make install
-}
-
-ch5_34() {
-  ./configure --prefix=/tools
-  make $JOPT
-  [ ! -z $TESTS ] && make check
-  make install
-}
-
-ch5_35() {
-  strip --strip-debug /tools/lib/*
-  /usr/bin/strip --strip-unneeded /tools/{,s}bin/*
-  rm -rf /tools/{,share}/{info,man,doc}
-  find /tools/{lib,libexec} -name \*.la -delete
-}
-
-ch5_36() {
-  chown -R root:root $LFS/tools
-}
-
-ch6_2() {
+ch7_3() {
   mkdir -pv $LFS/{dev,proc,sys,run}
   
   [ ! -f $LFS/dev/console ] && mknod -m 600 $LFS/dev/console c 5 1
-  [ ! -f $LFS/dev/null ] && mknod -m 666 $LFS/dev/null c 1 3
+  [ ! -f $LFS/dev/null ]    && mknod -m 666 $LFS/dev/null c 1 3
   
   mount -v --bind /dev $LFS/dev
   
-  mount -vt devpts devpts $LFS/dev/pts -o gid=5,mode=620
+  mount -v --bind /dev/pts $LFS/dev/pts
   mount -vt proc proc $LFS/proc
   mount -vt sysfs sysfs $LFS/sys
   mount -vt tmpfs tmpfs $LFS/run
@@ -617,47 +547,37 @@ ch6_2() {
   fi
 }
 
-ch6_4() {
-  chroot "$LFS" /tools/bin/env -i \
+ch7_4() {
+  chroot "$LFS" /usr/bin/env -i \
       HOME=/root                  \
       TERM="$TERM"                \
-      PS1='\u:\w\$ '              \
-      PATH=/bin:/usr/bin:/sbin:/usr/sbin:/tools/bin \
-      /tools/bin/bash --login +h
+      PS1='(lfs chroot) \u:\w\$ ' \
+      PATH=/bin:/usr/bin:/sbin:/usr/sbin \
+      /bin/bash --login +h
 }
 
-ch6_5() {
-  mkdir -pv /{bin,boot,etc/{opt,sysconfig},home,lib/firmware,mnt,opt}
-  mkdir -pv /{media/{floppy,cdrom},sbin,srv,var}
-  install -dv -m 0750 /root
-  install -dv -m 1777 /tmp /var/tmp
+ch7_5() {
+  mkdir -pv /{boot,home,mnt,opt,srv}
+  mkdir -pv /etc/{opt,sysconfig}
+  mkdir -pv /lib/firmware
+  mkdir -pv /media/{floppy,cdrom}
   mkdir -pv /usr/{,local/}{bin,include,lib,sbin,src}
   mkdir -pv /usr/{,local/}share/{color,dict,doc,info,locale,man}
-  mkdir -v  /usr/{,local/}share/{misc,terminfo,zoneinfo}
-  mkdir -v  /usr/libexec
+  mkdir -pv /usr/{,local/}share/{misc,terminfo,zoneinfo}
   mkdir -pv /usr/{,local/}share/man/man{1..8}
-  
-  case $(uname -m) in
-   x86_64) ln -sv lib /lib64
-           ln -sv lib /usr/lib64
-           ln -sv lib /usr/local/lib64 ;;
-  esac
-  
-  mkdir -v /var/{log,mail,spool}
-  ln -sv /run /var/run
-  ln -sv /run/lock /var/lock
-  mkdir -pv /var/{opt,cache,lib/{color,misc,locate},local}
+  mkdir -pv /var/{cache,local,log,mail,opt,spool}
+  mkdir -pv /var/lib/{color,misc,locate}
+
+  ln -sfv /run /var/run
+  ln -sfv /run/lock /var/lock
+
+  install -dv -m 0750 /root
+  install -dv -m 1777 /tmp /var/tmp
 }
 
-ch6_6_1() {
-  ln -sv /tools/bin/{bash,cat,chmod,dd,echo,ln,mkdir,pwd,rm,stty,touch} /bin
-  ln -sv /tools/bin/{env,install,perl,printf}         /usr/bin
-  ln -sv /tools/lib/libgcc_s.so{,.1}                  /usr/lib
-  ln -sv /tools/lib/libstdc++.{a,so{,.6}}             /usr/lib
-  
-  ln -sv bash /bin/sh
-  
+ch7_6_1() {
   ln -sv /proc/self/mounts /etc/mtab
+  echo "127.0.0.1 localhost $(hostname)" > /etc/hosts
 
 cat > /etc/passwd << "EOF"
 root:x:0:0:root:/root:/bin/bash
@@ -694,58 +614,205 @@ nogroup:x:99:
 users:x:999:
 EOF
 
+  echo "tester:x:$(ls -n $(tty) | cut -d" " -f3):101::/home/tester:/bin/bash" >> /etc/passwd
+  echo "tester:x:101:" >> /etc/group
+  install -o tester -d /home/tester
+
   # This will need to be run separately
-  exec /tools/bin/bash --login +h
+  exec /bin/bash --login +h
 }
 
-ch6_6_2() {
-  touch /var/log/{btmp,lastlog,wtmp}
+ch7_6_2() {
+  touch /var/log/{btmp,lastlog,faillog,wtmp}
   chgrp -v utmp /var/log/lastlog
   chmod -v 664  /var/log/lastlog
   chmod -v 600  /var/log/btmp
 }
 
-ch6_7() {
-  make mrproper
-  make INSTALL_HDR_PATH=dest headers_install
-  find dest/include \( -name .install -o -name ..install.cmd \) -delete
-  cp -rv dest/include/* /usr/include
+ch7_7() {
+  ln -s gthr-posix.h libgcc/gthr-default.h
+  mkdir -v build
+  cd       build
+  ../libstdc++-v3/configure            \
+      CXXFLAGS="-g -O2 -D_GNU_SOURCE"  \
+      --prefix=/usr                    \
+      --disable-multilib               \
+      --disable-nls                    \
+      --host=$(uname -m)-lfs-linux-gnu \
+      --disable-libstdcxx-pch
+  make $JOPT
+  make install
+  cd ..
 }
 
-ch6_8() {
+ch7_8() {
+  ./configure --disable-shared
+  make $JOPT
+  cp -v gettext-tools/src/{msgfmt,msgmerge,xgettext} /usr/bin
+}
+
+ch7_9() {
+  ./configure --prefix=/usr \
+              --docdir=/usr/share/doc/bison-3.7.1
+  make $JOPT
   make install
 }
 
-ch6_9() {
-patch -Np1 -i ../glibc-2.30-fhs-1.patch
-sed -i '/asm.socket.h/a# include <linux/sockios.h>' \
-   sysdeps/unix/sysv/linux/bits/socket.h
-case $(uname -m) in
-    i?86)   ln -sfv ld-linux.so.2 /lib/ld-lsb.so.3
-    ;;
-    x86_64) ln -sfv ../lib/ld-linux-x86-64.so.2 /lib64
-            ln -sfv ../lib/ld-linux-x86-64.so.2 /lib64/ld-lsb-x86-64.so.3
-    ;;
-esac
+ch7_10() {
+  sh Configure -des                                        \
+               -Dprefix=/usr                               \
+               -Dvendorprefix=/usr                         \
+               -Dprivlib=/usr/lib/perl5/5.32/core_perl     \
+               -Darchlib=/usr/lib/perl5/5.32/core_perl     \
+               -Dsitelib=/usr/lib/perl5/5.32/site_perl     \
+               -Dsitearch=/usr/lib/perl5/5.32/site_perl    \
+               -Dvendorlib=/usr/lib/perl5/5.32/vendor_perl \
+               -Dvendorarch=/usr/lib/perl5/5.32/vendor_perl
+  make $JOPT
+  make install
+}
+
+ch7_11() {
+  ./configure --prefix=/usr   \
+              --enable-shared \
+              --without-ensurepip
+  make $JOPT
+  make install
+}
+
+ch7_12() {
+  ./configure --prefix=/usr
+  make $JOPT
+  make install
+}
+
+ch7_13() {
+  mkdir -pv /var/lib/hwclock
+  ./configure ADJTIME_PATH=/var/lib/hwclock/adjtime    \
+              --docdir=/usr/share/doc/util-linux-2.36 \
+              --disable-chfn-chsh  \
+              --disable-login      \
+              --disable-nologin    \
+              --disable-su         \
+              --disable-setpriv    \
+              --disable-runuser    \
+              --disable-pylibmount \
+              --disable-static     \
+              --without-python
+  make $JOPT
+  make install
+}
+
+ch7_14_1() {
+  find /usr/{lib,libexec} -name \*.la -delete
+  rm -rf /usr/share/{info,man,doc}/*
+  exit
+}
+
+ch7_14_2() {
+  umount $LFS/dev{/pts,}
+  umount $LFS/{sys,proc,run}
+  strip --strip-debug $LFS/usr/lib/*
+  strip --strip-unneeded $LFS/usr/{,s}bin/*
+  strip --strip-unneeded $LFS/tools/bin/*
+
+
+  # Backup tools
+  cd $LFS &&
+  tar -cJpf $HOME/lfs-temp-tools-10.0.tar.xz .
+
+}
+
+ch7_14_3() {
+  # Restore from backup
+  cd $LFS &&
+  rm -rf ./* &&
+  tar -xpf $HOME/lfs-temp-tools-10.0.tar.xz
+}
+
+ch8_3() {
+  make install
+}
+
+ch8_4() {
+  tar -xf ../tcl8.6.10-html.tar.gz --strip-components=1
+  SRCDIR=$(pwd)
+  cd unix
+  ./configure --prefix=/usr           \
+              --mandir=/usr/share/man \
+              $([ "$(uname -m)" = x86_64 ] && echo --enable-64bit)
+  make
+
+  sed -e "s|$SRCDIR/unix|/usr/lib|" \
+      -e "s|$SRCDIR|/usr/include|"  \
+      -i tclConfig.sh
+
+  sed -e "s|$SRCDIR/unix/pkgs/tdbc1.1.1|/usr/lib/tdbc1.1.1|" \
+      -e "s|$SRCDIR/pkgs/tdbc1.1.1/generic|/usr/include|"    \
+      -e "s|$SRCDIR/pkgs/tdbc1.1.1/library|/usr/lib/tcl8.6|" \
+      -e "s|$SRCDIR/pkgs/tdbc1.1.1|/usr/include|"            \
+      -i pkgs/tdbc1.1.1/tdbcConfig.sh
+
+  sed -e "s|$SRCDIR/unix/pkgs/itcl4.2.0|/usr/lib/itcl4.2.0|" \
+      -e "s|$SRCDIR/pkgs/itcl4.2.0/generic|/usr/include|"    \
+      -e "s|$SRCDIR/pkgs/itcl4.2.0|/usr/include|"            \
+      -i pkgs/itcl4.2.0/itclConfig.sh
+
+  unset SRCDIR
+  make install
+  make test
+  chmod -v u+w /usr/lib/libtcl8.6.so
+  make install-private-headers
+  ln -sfv tclsh8.6 /usr/bin/tclsh
+}
+
+ch8_5() {
+./configure --prefix=/usr           \
+            --with-tcl=/usr/lib     \
+            --enable-shared         \
+            --mandir=/usr/share/man \
+            --with-tclinclude=/usr/include
+make
+make test
+make install
+ln -svf expect5.45.4/libexpect5.45.4.so /usr/lib
+}
+
+ch8_6() {
+  ./configure --prefix=/usr
+  makeinfo --html --no-split -o doc/dejagnu.html doc/dejagnu.texi
+  makeinfo --plaintext       -o doc/dejagnu.txt  doc/dejagnu.texi
+
+  make install
+  install -v -dm755  /usr/share/doc/dejagnu-1.6.2
+  install -v -m644   doc/dejagnu.{html,txt} /usr/share/doc/dejagnu-1.6.2
+
+  make check
+}
+
+ch8_7() {
+  cp services protocols /etc
+}
+
+ch8_8() {
+patch -Np1 -i ../glibc-2.32-fhs-1.patch
 mkdir -v build
 cd       build
-CC="gcc -ffile-prefix-map=/tools=/usr" \
-../configure --prefix=/usr                          \
-             --disable-werror                       \
-             --enable-kernel=3.2                    \
-             --enable-stack-protector=strong        \
-             --with-headers=/usr/include            \
-             libc_cv_slibdir=/lib	\
-						>$LP/ch6_9.conf.log 2>$LP/ch6_9.conf.err
-make $JOPT >$LP/ch6_9.conf.log 2>$LP/ch6_9.conf.err
+../configure --prefix=/usr                            \
+             --disable-werror                         \
+             --enable-kernel=3.2                      \
+             --enable-stack-protector=strong          \
+             --with-headers=/usr/include              \
+             libc_cv_slibdir=/lib
+make
 case $(uname -m) in
   i?86)   ln -sfnv $PWD/elf/ld-linux.so.2        /lib ;;
   x86_64) ln -sfnv $PWD/elf/ld-linux-x86-64.so.2 /lib ;;
 esac
-make check >$LP/ch6_9.conf.log 2>$LP/ch6_9.conf.err
+make check
 touch /etc/ld.so.conf
 sed '/test-installation/s@$(PERL)@echo not running@' -i ../Makefile
-make install >$LP/ch6_9.conf.log 2>$LP/ch6_9.conf.err
+make install
 cp -v ../nscd/nscd.conf /etc/nscd.conf
 mkdir -pv /var/cache/nscd
 mkdir -pv /usr/lib/locale
@@ -775,7 +842,6 @@ localedef -i ru_RU -f UTF-8 ru_RU.UTF-8
 localedef -i tr_TR -f UTF-8 tr_TR.UTF-8
 localedef -i zh_CN -f GB18030 zh_CN.GB18030
 localedef -i zh_HK -f BIG5-HKSCS zh_HK.BIG5-HKSCS
-make localedata/install-locales
 
 cat > /etc/nsswitch.conf << "EOF"
 # Begin /etc/nsswitch.conf
@@ -795,7 +861,7 @@ rpc: files
 # End /etc/nsswitch.conf
 EOF
 
-tar -xf ../../tzdata2019b.tar.gz
+tar -xf ../../tzdata2020a.tar.gz
 
 ZONEINFO=/usr/share/zoneinfo
 mkdir -pv $ZONEINFO/{posix,right}
@@ -812,7 +878,6 @@ zic -d $ZONEINFO -p America/New_York
 unset ZONEINFO
 
 ln -sfv /usr/share/zoneinfo/America/Los_Angeles /etc/localtime
-
 cat > /etc/ld.so.conf << "EOF"
 # Begin /etc/ld.so.conf
 /usr/local/lib
@@ -826,206 +891,18 @@ include /etc/ld.so.conf.d/*.conf
 
 EOF
 mkdir -pv /etc/ld.so.conf.d
-
-  cd ..
 }
 
-ch6_10() {
-  mv -v /tools/bin/{ld,ld-old}
-  mv -v /tools/$(uname -m)-pc-linux-gnu/bin/{ld,ld-old}
-  mv -v /tools/bin/{ld-new,ld}
-  ln -sv /tools/bin/ld /tools/$(uname -m)-pc-linux-gnu/bin/ld
-  
-  gcc -dumpspecs | sed -e 's@/tools@@g'                   \
-      -e '/\*startfile_prefix_spec:/{n;s@.*@/usr/lib/ @}' \
-      -e '/\*cpp:/{n;s@$@ -isystem /usr/include@}' >      \
-      `dirname $(gcc --print-libgcc-file-name)`/specs
-  
-  echo 'int main(){}' > dummy.c
-  cc dummy.c -v -Wl,--verbose &> dummy.log
-  readelf -l a.out | grep ': /lib'
-  
-  grep -o '/usr/lib.*/crt[1in].*succeeded' dummy.log
-  grep -B1 '^ /usr/include' dummy.log
-  grep 'SEARCH.*/usr/lib' dummy.log |sed 's|; |\n|g'
-  grep "/lib.*/libc.so.6 " dummy.log
-  grep found dummy.log
-  rm -v dummy.c a.out dummy.log
-}
-
-ch6_11() {
-  ./configure --prefix=/usr
-  make $JOPT 
-  make check
-  make install
-  mv -v /usr/lib/libz.so.* /lib
-  ln -sfv ../../lib/$(readlink /usr/lib/libz.so) /usr/lib/libz.so
-}
-
-ch6_12() {
-  ./configure --prefix=/usr
-  make $JOPT 
-  make check
-  make install
-}
-
-ch6_13() {
-  sed -i '/MV.*old/d' Makefile.in
-  sed -i '/{OLDSUFF}/c:' support/shlib-install
-  
-  ./configure --prefix=/usr    \
-              --disable-static \
-              --docdir=/usr/share/doc/readline-8.0
-  
-  make $JOPT SHLIB_LIBS="-L/tools/lib -lncursesw"
-  make SHLIB_LIBS="-L/tools/lib -lncursesw" install
-  mv -v /usr/lib/lib{readline,history}.so.* /lib
-  chmod -v u+w /lib/lib{readline,history}.so.*
-  ln -sfv ../../lib/$(readlink /usr/lib/libreadline.so) /usr/lib/libreadline.so
-  ln -sfv ../../lib/$(readlink /usr/lib/libhistory.so ) /usr/lib/libhistory.so
-  install -v -m644 doc/*.{ps,pdf,html,dvi} /usr/share/doc/readline-8.0
-}
-
-ch6_14() {
-  sed -i 's/IO_ftrylockfile/IO_EOF_SEEN/' lib/*.c
-  echo "#define _IO_IN_BACKUP 0x100" >> lib/stdio-impl.h
-  ./configure --prefix=/usr
-  make $JOPT 
-  make check
-  make install
-}
-
-ch6_15() {
-  PREFIX=/usr CC=gcc CFLAGS="-std=c99" ./configure.sh -G -O3
-  make $JOPT 
-  make test
-  make install
-}
-
-ch6_16() {
-  expect -c "spawn ls"
-  sed -i '/@\tincremental_copy/d' gold/testsuite/Makefile.in
-  mkdir -v build
-  cd build
-  ../configure --prefix=/usr       \
-               --enable-gold       \
-               --enable-ld=default \
-               --enable-plugins    \
-               --enable-shared     \
-               --disable-werror    \
-               --enable-64-bit-bfd \
-               --with-system-zlib
-  
-  make $JOPT tooldir=/usr
-  make -k check
-  make tooldir=/usr install
-}
-
-ch6_17() {
-  ./configure --prefix=/usr    \
-              --enable-cxx     \
-              --disable-static \
-              --docdir=/usr/share/doc/gmp-6.1.2
-  make $JOPT 
-  make html
-  make check 2>&1 | tee gmp-check-log
-  awk '/# PASS:/{total+=$3} ; END{print total}' gmp-check-log
-  make install
-  make install-html
-}
-
-ch6_18() {
-  ./configure --prefix=/usr        \
-              --disable-static     \
-              --enable-thread-safe \
-              --docdir=/usr/share/doc/mpfr-4.0.2
-  make $JOPT 
-  make html
-  make check
-  make install
-  make install-html
-}
-
-ch6_19() {
-  ./configure --prefix=/usr    \
-              --disable-static \
-              --docdir=/usr/share/doc/mpc-1.1.0
-  make $JOPT 
-  make html
-  make check
-  make install
-  make install-html
-}
-
-ch6_20() {
-  sed -i 's/groups$(EXEEXT) //' src/Makefile.in
-  find man -name Makefile.in -exec sed -i 's/groups\.1 / /'   {} \;
-  find man -name Makefile.in -exec sed -i 's/getspnam\.3 / /' {} \;
-  find man -name Makefile.in -exec sed -i 's/passwd\.5 / /'   {} \;
-  
-  sed -i -e 's@#ENCRYPT_METHOD DES@ENCRYPT_METHOD SHA512@' \
-         -e 's@/var/spool/mail@/var/mail@' etc/login.defs
-  
-  sed -i 's/1000/999/' etc/useradd
-  ./configure --sysconfdir=/etc --with-group-name-max-length=32
-  make $JOPT 
-  make install
-  mv -v /usr/bin/passwd /bin
-
-  pwconv
-  grpconv
-  echo root:rootpass | chpasswd
-}
-
-ch6_21() {
-case $(uname -m) in
-  x86_64)
-    sed -e '/m64=/s/lib64/lib/' \
-        -i.orig gcc/config/i386/t-linux64
-  ;;
-esac
-mkdir -v build
-cd       build
-SED=sed                               \
-../configure --prefix=/usr            \
-             --enable-languages=c,c++ \
-             --disable-multilib       \
-             --disable-bootstrap      \
-             --with-system-zlib
+ch8_9() {
+./configure --prefix=/usr
 make $JOPT
-ulimit -s 32768
-chown -Rv nobody . 
-su nobody -s /bin/bash -c "PATH=$PATH make -k check"
-../contrib/test_summary
+make check
 make install
-rm -rf /usr/lib/gcc/$(gcc -dumpmachine)/9.2.0/include-fixed/bits/
-
-chown -v -R root:root \
-    /usr/lib/gcc/*linux-gnu/9.2.0/include{,-fixed}
-
-ln -sv ../usr/bin/cpp /lib
-
-ln -sv gcc /usr/bin/cc
-install -v -dm755 /usr/lib/bfd-plugins
-ln -sfv ../../libexec/gcc/$(gcc -dumpmachine)/9.2.0/liblto_plugin.so \
-        /usr/lib/bfd-plugins/
-echo 'int main(){}' > dummy.c
-cc dummy.c -v -Wl,--verbose &> dummy.log
-readelf -l a.out | grep ': /lib'
-
-
-grep -o '/usr/lib.*/crt[1in].*succeeded' dummy.log
-grep -B4 '^ /usr/include' dummy.log
-grep 'SEARCH.*/usr/lib' dummy.log |sed 's|; |\n|g'
-grep "/lib.*/libc.so.6 " dummy.log
-grep found dummy.log
-rm -v dummy.c a.out dummy.log
-mkdir -pv /usr/share/gdb/auto-load/usr/lib
-mv -v /usr/lib/*gdb.py /usr/share/gdb/auto-load/usr/lib
-cd ..
+mv -v /usr/lib/libz.so.* /lib
+ln -sfv ../../lib/$(readlink /usr/lib/libz.so) /usr/lib/libz.so
 }
 
-ch6_22() {
+ch8_10() {
   patch -Np1 -i ../bzip2-1.0.8-install_docs-1.patch
   sed -i 's@\(ln -s -f \)$(PREFIX)/bin/@\1@' Makefile
   sed -i "s@(PREFIX)/man@(PREFIX)/share/man@g" Makefile
@@ -1041,55 +918,141 @@ ch6_22() {
   ln -sv bzip2 /bin/bzcat
 }
 
-ch6_23() {
-  ./configure --prefix=/usr              \
-              --with-internal-glib       \
-              --disable-host-tool        \
-              --docdir=/usr/share/doc/pkg-config-0.29.2
+ch8_11() {
+  ./configure --prefix=/usr    \
+              --disable-static \
+              --docdir=/usr/share/doc/xz-5.2.5
+  make $JOPT
+  make check
+  make install
+  mv -v   /usr/bin/{lzma,unlzma,lzcat,xz,unxz,xzcat} /bin
+  mv -v /usr/lib/liblzma.so.* /lib
+  ln -svf ../../lib/$(readlink /usr/lib/liblzma.so) /usr/lib/liblzma.so
+}
+
+ch8_12() {
+  make $JOPT
+  make prefix=/usr install
+  rm -v /usr/lib/libzstd.a
+  mv -v /usr/lib/libzstd.so.* /lib
+  ln -sfv ../../lib/$(readlink /usr/lib/libzstd.so) /usr/lib/libzstd.so
+}
+
+ch8_13() {
+  ./configure --prefix=/usr
   make $JOPT
   make check
   make install
 }
 
-ch6_24 () {
-  sed -i '/LIBTOOL_INSTALL/d' c++/Makefile.in
-  ./configure --prefix=/usr           \
-            --mandir=/usr/share/man \
-            --with-shared           \
-            --without-debug         \
-            --without-normal        \
-            --enable-pc-files       \
-            --enable-widec
-  make $JOPT
-  make install
-  mv -v /usr/lib/libncursesw.so.6* /lib
-  ln -sfv ../../lib/$(readlink /usr/lib/libncursesw.so) /usr/lib/libncursesw.so
-  for lib in ncurses form panel menu ; do
-    rm -vf                    /usr/lib/lib${lib}.so
-    echo "INPUT(-l${lib}w)" > /usr/lib/lib${lib}.so
-    ln -sfv ${lib}w.pc        /usr/lib/pkgconfig/${lib}.pc
-  done
-  rm -vf                     /usr/lib/libcursesw.so
-  echo "INPUT(-lncursesw)" > /usr/lib/libcursesw.so
-  ln -sfv libncurses.so      /usr/lib/libcurses.so
-  mkdir -v       /usr/share/doc/ncurses-6.1
-  cp -v -R doc/* /usr/share/doc/ncurses-6.1
+ch8_14() {
+  sed -i '/MV.*old/d' Makefile.in
+  sed -i '/{OLDSUFF}/c:' support/shlib-install
+  ./configure --prefix=/usr    \
+              --disable-static \
+              --with-curses    \
+              --docdir=/usr/share/doc/readline-8.0
+  make SHLIB_LIBS="-lncursesw"
+  make SHLIB_LIBS="-lncursesw" install
+  mv -v /usr/lib/lib{readline,history}.so.* /lib
+  chmod -v u+w /lib/lib{readline,history}.so.*
+  ln -sfv ../../lib/$(readlink /usr/lib/libreadline.so) /usr/lib/libreadline.so
+  ln -sfv ../../lib/$(readlink /usr/lib/libhistory.so ) /usr/lib/libhistory.so
+  install -v -m644 doc/*.{ps,pdf,html,dvi} /usr/share/doc/readline-8.0
 }
 
-ch6_25 () {
+ch8_15() {
+  sed -i 's/IO_ftrylockfile/IO_EOF_SEEN/' lib/*.c
+  echo "#define _IO_IN_BACKUP 0x100" >> lib/stdio-impl.h
+  ./configure --prefix=/usr
+  make $JOPT
+  make check
+  make install
+}
+
+ch8_16() {
+  PREFIX=/usr CC=gcc CFLAGS="-std=c99" ./configure.sh -G -O3
+  make $JOPT
+  make test
+  make install
+}
+
+ch8_17() {
+  ./configure --prefix=/usr --docdir=/usr/share/doc/flex-2.6.4
+  make $JOPT
+  make check
+  make install
+  ln -sv flex /usr/bin/lex
+}
+
+ch8_18() {
+  expect -c "spawn ls"
+  sed -i '/@\tincremental_copy/d' gold/testsuite/Makefile.in
+  mkdir -v build
+  cd       build
+  ../configure --prefix=/usr       \
+               --enable-gold       \
+               --enable-ld=default \
+               --enable-plugins    \
+               --enable-shared     \
+               --disable-werror    \
+               --enable-64-bit-bfd \
+               --with-system-zlib
+  make tooldir=/usr
+  make -k check
+  make tooldir=/usr install
+}
+
+ch8_19() {
+  ./configure --prefix=/usr    \
+              --enable-cxx     \
+              --disable-static \
+              --docdir=/usr/share/doc/gmp-6.2.0
+  make $JOPT
+  make html
+  make check 2>&1 | tee gmp-check-log
+  awk '/# PASS:/{total+=$3} ; END{print total}' gmp-check-log
+  make install
+  make install-html
+}
+
+ch8_20() {
+  ./configure --prefix=/usr        \
+              --disable-static     \
+              --enable-thread-safe \
+              --docdir=/usr/share/doc/mpfr-4.1.0
+  make $JOPT
+  make html
+  make check
+  make install
+  make install-html
+}
+
+ch8_21() {
+  ./configure --prefix=/usr    \
+              --disable-static \
+              --docdir=/usr/share/doc/mpc-1.1.0
+  make $JOPT
+  make html
+  make check
+  make install
+  make install-html
+}
+
+ch8_22() {
   ./configure --prefix=/usr     \
               --bindir=/bin     \
               --disable-static  \
               --sysconfdir=/etc \
               --docdir=/usr/share/doc/attr-2.4.48
-  make $JOPT
+  make
   make check
   make install
   mv -v /usr/lib/libattr.so.* /lib
   ln -sfv ../../lib/$(readlink /usr/lib/libattr.so) /usr/lib/libattr.so
 }
 
-ch6_26() {
+ch8_23() {
   ./configure --prefix=/usr         \
               --bindir=/bin         \
               --disable-static      \
@@ -1101,84 +1064,187 @@ ch6_26() {
   ln -sfv ../../lib/$(readlink /usr/lib/libacl.so) /usr/lib/libacl.so
 }
 
-ch6_27() {
-  sed -i '/install.*STALIBNAME/d' libcap/Makefile
-  make $JOPT
-  make RAISE_SETFCAP=no lib=lib prefix=/usr install
-  chmod -v 755 /usr/lib/libcap.so.2.27
-  mv -v /usr/lib/libcap.so.* /lib
-  ln -sfv ../../lib/$(readlink /usr/lib/libcap.so) /usr/lib/libcap.so
+ch8_24() {
+  sed -i '/install -m.*STACAPLIBNAME/d' libcap/Makefile
+  make lib=lib
+  make test
+  make lib=lib PKGCONFIGDIR=/usr/lib/pkgconfig install
+  chmod -v 755 /lib/libcap.so.2.42
+  mv -v /lib/libpsx.a /usr/lib
+  rm -v /lib/libcap.so
+  ln -sfv ../../lib/libcap.so.2 /usr/lib/libcap.so
 }
 
-ch6_28() {
-  sed -i 's/usr/tools/'                 build-aux/help2man
-  sed -i 's/testsuite.panic-tests.sh//' Makefile.in
+ch8_25() {
+  sed -i 's/groups$(EXEEXT) //' src/Makefile.in
+  find man -name Makefile.in -exec sed -i 's/groups\.1 / /'   {} \;
+  find man -name Makefile.in -exec sed -i 's/getspnam\.3 / /' {} \;
+  find man -name Makefile.in -exec sed -i 's/passwd\.5 / /'   {} \;
+  sed -e 's:#ENCRYPT_METHOD DES:ENCRYPT_METHOD SHA512:' \
+      -e 's:/var/spool/mail:/var/mail:'                 \
+      -i etc/login.defs
+  sed -i 's/1000/999/' etc/useradd
+  touch /usr/bin/passwd
+  ./configure --sysconfdir=/etc \
+              --with-group-name-max-length=32
+  make $JOPT
+  make install
+  pwconv
+  grpconv
+  #passwd root
+  echo "root:lfspassword" | chpasswd
+}
+
+ch8_26() {
+  case $(uname -m) in
+    x86_64)
+      sed -e '/m64=/s/lib64/lib/' \
+          -i.orig gcc/config/i386/t-linux64
+    ;;
+  esac
+
+  mkdir -v build
+  cd       build
+  ../configure --prefix=/usr            \
+               LD=ld                    \
+               --enable-languages=c,c++ \
+               --disable-multilib       \
+               --disable-bootstrap      \
+               --with-system-zlib
+  make $JOPT
+  ulimit -s 32768
+  chown -Rv tester . 
+  su tester -c "PATH=$PATH make -k check"
+  ../contrib/test_summary
+  make install
+  rm -rf /usr/lib/gcc/$(gcc -dumpmachine)/10.2.0/include-fixed/bits/
+  chown -v -R root:root \
+      /usr/lib/gcc/*linux-gnu/10.2.0/include{,-fixed}
+  ln -sv ../usr/bin/cpp /lib
+  install -v -dm755 /usr/lib/bfd-plugins
+  ln -sfv ../../libexec/gcc/$(gcc -dumpmachine)/10.2.0/liblto_plugin.so \
+          /usr/lib/bfd-plugins/
+  echo 'int main(){}' > dummy.c
+  cc dummy.c -v -Wl,--verbose &> dummy.log
+  readelf -l a.out | grep ': /lib'
+  grep -o '/usr/lib.*/crt[1in].*succeeded' dummy.log
+  grep -B4 '^ /usr/include' dummy.log
+  grep 'SEARCH.*/usr/lib' dummy.log |sed 's|; |\n|g'
+  grep "/lib.*/libc.so.6 " dummy.log
+  grep found dummy.log
+  rm -v dummy.c a.out dummy.log
+  mkdir -pv /usr/share/gdb/auto-load/usr/lib
+  mv -v /usr/lib/*gdb.py /usr/share/gdb/auto-load/usr/lib
+}
+
+ch8_27() {
+  ./configure --prefix=/usr              \
+              --with-internal-glib       \
+              --disable-host-tool        \
+              --docdir=/usr/share/doc/pkg-config-0.29.2
+  make $JOPT
+  make check
+  make install
+}
+
+ch8_28() {
+  sed -i '/LIBTOOL_INSTALL/d' c++/Makefile.in
+  ./configure --prefix=/usr           \
+              --mandir=/usr/share/man \
+              --with-shared           \
+              --without-debug         \
+              --without-normal        \
+              --enable-pc-files       \
+              --enable-widec
+  make $JOPT
+  make install
+  mv -v /usr/lib/libncursesw.so.6* /lib
+  ln -sfv ../../lib/$(readlink /usr/lib/libncursesw.so) /usr/lib/libncursesw.so
+  for lib in ncurses form panel menu ; do
+      rm -vf                    /usr/lib/lib${lib}.so
+      echo "INPUT(-l${lib}w)" > /usr/lib/lib${lib}.so
+      ln -sfv ${lib}w.pc        /usr/lib/pkgconfig/${lib}.pc
+  done
+  rm -vf                     /usr/lib/libcursesw.so
+  echo "INPUT(-lncursesw)" > /usr/lib/libcursesw.so
+  ln -sfv libncurses.so      /usr/lib/libcurses.so
+
+
+  mkdir -v       /usr/share/doc/ncurses-6.2
+  cp -v -R doc/* /usr/share/doc/ncurses-6.2
+}
+
+ch8_29() {
   ./configure --prefix=/usr --bindir=/bin
   make $JOPT
   make html
-  make check
+  chown -Rv tester .
+  su tester -c "PATH=$PATH make check"
   make install
-  install -d -m755           /usr/share/doc/sed-4.7
-  install -m644 doc/sed.html /usr/share/doc/sed-4.7
+  install -d -m755           /usr/share/doc/sed-4.8
+  install -m644 doc/sed.html /usr/share/doc/sed-4.8
 }
 
-ch6_29() {
-  ./configure --prefix=/usr
-  make $JOPT
-  make install
-  mv -v /usr/bin/fuser   /bin
-  mv -v /usr/bin/killall /bin
+ch8_30() {
+./configure --prefix=/usr
+make $JOPT
+make install
+mv -v /usr/bin/fuser   /bin
+mv -v /usr/bin/killall /bin
 }
 
-ch6_30() {
-  make $JOPT
-  make install
-}
-
-ch6_31() {
-  sed -i '6855 s/mv/cp/' Makefile.in
-  ./configure --prefix=/usr --docdir=/usr/share/doc/bison-3.4.1
-  make -j1
-  make install
-}
-
-ch6_32() {
-  sed -i "/math.h/a #include <malloc.h>" src/flexdef.h
-  HELP2MAN=/tools/bin/true \
-  ./configure --prefix=/usr --docdir=/usr/share/doc/flex-2.6.4
+ch8_31() {
+  ./configure --prefix=/usr    \
+              --disable-static \
+              --docdir=/usr/share/doc/gettext-0.21
   make $JOPT
   make check
   make install
-  ln -sv flex /usr/bin/lex
+  chmod -v 0755 /usr/lib/preloadable_libintl.so
 }
 
-ch6_33() {
+ch8_32() {
+  ./configure --prefix=/usr --docdir=/usr/share/doc/bison-3.7.1
+  make $JOPT
+  make check
+  make install
+}
+
+ch8_33() {
   ./configure --prefix=/usr --bindir=/bin
   make $JOPT
-  make -k check
+  make check
   make install
 }
 
-ch6_34() {
+ch8_34() {
+  patch -Np1 -i ../bash-5.0-upstream_fixes-1.patch
   ./configure --prefix=/usr                    \
               --docdir=/usr/share/doc/bash-5.0 \
               --without-bash-malloc            \
               --with-installed-readline
   make $JOPT
-  chown -Rv nobody .
-  su nobody -s /bin/bash -c "PATH=$PATH HOME=/home make tests"
+  chown -Rv tester .
+su tester << EOF
+PATH=$PATH make tests < $(tty)
+EOF
   make install
   mv -vf /usr/bin/bash /bin
 }
 
-ch6_35() {
+ch8_34_1() {
+  exec /bin/bash --login +h
+}
+
+ch8_35() {
   ./configure --prefix=/usr
   make $JOPT
-  make check # TESTSUITEFLAGS=-j`nproc
+  make check
   make install
 }
 
-ch6_36() {
+ch8_36() {
+  sed -r -i '/^char.*parseopt_program_(doc|args)/d' src/parseopt.c
   ./configure --prefix=/usr    \
               --disable-static \
               --enable-libgdbm-compat
@@ -1187,25 +1253,24 @@ ch6_36() {
   make install
 }
 
-ch6_37() {
+ch8_37() {
   ./configure --prefix=/usr --docdir=/usr/share/doc/gperf-3.1
   make $JOPT
   make -j1 check
   make install
 }
 
-ch6_38() {
-  sed -i 's|usr/bin/env |bin/|' run.sh.in
+ch8_38() {
   ./configure --prefix=/usr    \
               --disable-static \
-              --docdir=/usr/share/doc/expat-2.2.7
+              --docdir=/usr/share/doc/expat-2.2.9
   make $JOPT
   make check
   make install
-  install -v -m644 doc/*.{html,png,css} /usr/share/doc/expat-2.2.7
+  install -v -m644 doc/*.{html,png,css} /usr/share/doc/expat-2.2.9
 }
 
-ch6_39() {
+ch8_39() {
   ./configure --prefix=/usr        \
               --localstatedir=/var \
               --disable-logger     \
@@ -1222,31 +1287,37 @@ ch6_39() {
   mv -v /usr/bin/ifconfig /sbin
 }
 
-ch6_40() {
-  echo "127.0.0.1 localhost $(hostname)" > /etc/hosts
+ch8_40() {
   export BUILD_ZLIB=False
   export BUILD_BZIP2=0
-  sh Configure -des -Dprefix=/usr                 \
-                    -Dvendorprefix=/usr           \
-                    -Dman1dir=/usr/share/man/man1 \
-                    -Dman3dir=/usr/share/man/man3 \
-                    -Dpager="/usr/bin/less -isR"  \
-                    -Duseshrplib                  \
-                    -Dusethreads
+  sh Configure -des                                         \
+               -Dprefix=/usr                                \
+               -Dvendorprefix=/usr                          \
+               -Dprivlib=/usr/lib/perl5/5.32/core_perl      \
+               -Darchlib=/usr/lib/perl5/5.32/core_perl      \
+               -Dsitelib=/usr/lib/perl5/5.32/site_perl      \
+               -Dsitearch=/usr/lib/perl5/5.32/site_perl     \
+               -Dvendorlib=/usr/lib/perl5/5.32/vendor_perl  \
+               -Dvendorarch=/usr/lib/perl5/5.32/vendor_perl \
+               -Dman1dir=/usr/share/man/man1                \
+               -Dman3dir=/usr/share/man/man3                \
+               -Dpager="/usr/bin/less -isR"                 \
+               -Duseshrplib                                 \
+               -Dusethreads
   make $JOPT
-  make -k test
+  make test
   make install
   unset BUILD_ZLIB BUILD_BZIP2
 }
 
-ch6_41() {
+ch8_41() {
   perl Makefile.PL
   make $JOPT
   make test
   make install
 }
 
-ch6_42() {
+ch8_42() {
   sed -i 's:\\\${:\\\$\\{:' intltool-update.in
   ./configure --prefix=/usr
   make $JOPT
@@ -1255,34 +1326,23 @@ ch6_42() {
   install -v -Dm644 doc/I18N-HOWTO /usr/share/doc/intltool-0.51.0/I18N-HOWTO
 }
 
-ch6_43() {
-  sed '361 s/{/\\{/' -i bin/autoscan.in
+ch8_43() {
+  sed -i '361 s/{/\\{/' bin/autoscan.in
   ./configure --prefix=/usr
   make $JOPT
   make check
   make install
 }
 
-ch6_44() {
-  ./configure --prefix=/usr --docdir=/usr/share/doc/automake-1.16.1
+ch8_44() {
+  sed -i "s/''/etags/" t/tags-lisp-space.sh
+  ./configure --prefix=/usr --docdir=/usr/share/doc/automake-1.16.2
   make $JOPT
   make -j4 check
   make install
 }
 
-ch6_45() {
-  ./configure --prefix=/usr    \
-              --disable-static \
-              --docdir=/usr/share/doc/xz-5.2.4
-  make $JOPT
-  make check
-  make install
-  mv -v   /usr/bin/{lzma,unlzma,lzcat,xz,unxz,xzcat} /bin
-  mv -v /usr/lib/liblzma.so.* /lib
-  ln -svf ../../lib/$(readlink /usr/lib/liblzma.so) /usr/lib/liblzma.so
-}
-
-ch6_46() {
+ch8_45() {
   ./configure --prefix=/usr          \
               --bindir=/bin          \
               --sysconfdir=/etc      \
@@ -1294,43 +1354,27 @@ ch6_46() {
   for target in depmod insmod lsmod modinfo modprobe rmmod; do
     ln -sfv ../bin/kmod /sbin/$target
   done
+
   ln -sfv kmod /bin/lsmod
 }
 
-ch6_47() {
-  ./configure --prefix=/usr    \
-              --disable-static \
-              --docdir=/usr/share/doc/gettext-0.20.1
-  make $JOPT
-  make check
-  make install
-  chmod -v 0755 /usr/lib/preloadable_libintl.so
-}
-
-ch6_48() {
-  ./configure --prefix=/usr
+ch8_46() {
+  ./configure --prefix=/usr --disable-debuginfod --libdir=/lib
   make $JOPT
   make check
   make -C libelf install
   install -vm644 config/libelf.pc /usr/lib/pkgconfig
+  rm /lib/libelf.a
 }
 
-ch6_49() {
-  sed -e '/^includesdir/ s/$(libdir).*$/$(includedir)/' \
-      -i include/Makefile.in
-  
-  sed -e '/^includedir/ s/=.*$/=@includedir@/' \
-      -e 's/^Cflags: -I${includedir}/Cflags:/' \
-      -i libffi.pc.in
+ch8_47() {
   ./configure --prefix=/usr --disable-static --with-gcc-arch=native
   make $JOPT
   make check
   make install
 }
 
-ch6_50() {
-  sed -i '/\} data/s/ =.*$/;\n    memset(\&data, 0, sizeof(data));/' \
-    crypto/rand/rand_lib.c
+ch8_48() {
   ./config --prefix=/usr         \
            --openssldir=/etc/ssl \
            --libdir=lib          \
@@ -1340,11 +1384,11 @@ ch6_50() {
   make test
   sed -i '/INSTALL_LIBS/s/libcrypto.a libssl.a//' Makefile
   make MANSUFFIX=ssl install
-  mv -v /usr/share/doc/openssl /usr/share/doc/openssl-1.1.1c
-  cp -vfr doc/* /usr/share/doc/openssl-1.1.1c
+  mv -v /usr/share/doc/openssl /usr/share/doc/openssl-1.1.1g
+  cp -vfr doc/* /usr/share/doc/openssl-1.1
 }
 
-ch6_51() {
+ch8_49() {
   ./configure --prefix=/usr       \
               --enable-shared     \
               --with-system-expat \
@@ -1352,49 +1396,52 @@ ch6_51() {
               --with-ensurepip=yes
   make $JOPT
   make install
-  chmod -v 755 /usr/lib/libpython3.7m.so
+  chmod -v 755 /usr/lib/libpython3.8.so
   chmod -v 755 /usr/lib/libpython3.so
-  ln -sfv pip3.7 /usr/bin/pip3
-  install -v -dm755 /usr/share/doc/python-3.7.4/html 
-  
+  ln -sfv pip3.8 /usr/bin/pip3
+
+  install -v -dm755 /usr/share/doc/python-3.8.5/html 
+
   tar --strip-components=1  \
       --no-same-owner       \
       --no-same-permissions \
-      -C /usr/share/doc/python-3.7.4/html \
-      -xvf ../python-3.7.4-docs-html.tar.bz2
+      -C /usr/share/doc/python-3.8.5/html \
+      -xvf ../python-3.8.5-docs-html.tar.bz2
 }
 
-ch6_52() {
+ch8_50() {
+  sed -i '/int Guess/a \
+    int   j = 0;\
+    char* jobs = getenv( "NINJAJOBS" );\
+    if ( jobs != NULL ) j = atoi( jobs );\
+    if ( j > 0 ) return j;\
+  ' src/ninja.cc
   python3 configure.py --bootstrap
-  
-  
   ./ninja ninja_test
   ./ninja_test --gtest_filter=-SubprocessTest.SetWithLots
-  
   install -vm755 ninja /usr/bin/
   install -vDm644 misc/bash-completion /usr/share/bash-completion/completions/ninja
   install -vDm644 misc/zsh-completion  /usr/share/zsh/site-functions/_ninja
 }
 
-ch6_53() {
+ch8_51() {
   python3 setup.py build
   python3 setup.py install --root=dest
   cp -rv dest/* /
 }
 
-ch6_54() {
-  patch -Np1 -i ../coreutils-8.31-i18n-1.patch
+ch8_52() {
+  patch -Np1 -i ../coreutils-8.32-i18n-1.patch
   sed -i '/test.lock/s/^/#/' gnulib-tests/gnulib.mk
   autoreconf -fiv
   FORCE_UNSAFE_CONFIGURE=1 ./configure \
               --prefix=/usr            \
               --enable-no-install-program=kill,uptime
   make $JOPT
-  make NON_ROOT_USERNAME=nobody check-root
-  echo "dummy:x:1000:nobody" >> /etc/group
-  chown -Rv nobody . 
-  su nobody -s /bin/bash \
-            -c "PATH=$PATH make RUN_EXPENSIVE_TESTS=yes check"
+  make NON_ROOT_USERNAME=tester check-root
+  echo "dummy:x:102:tester" >> /etc/group
+  chown -Rv tester . 
+  su tester -c "PATH=$PATH make RUN_EXPENSIVE_TESTS=yes check"
   sed -i '/dummy/d' /etc/group
   make install
   mv -v /usr/bin/{cat,chgrp,chmod,chown,cp,date,dd,df,echo} /bin
@@ -1402,56 +1449,51 @@ ch6_54() {
   mv -v /usr/bin/{rmdir,stty,sync,true,uname} /bin
   mv -v /usr/bin/chroot /usr/sbin
   mv -v /usr/share/man/man1/chroot.1 /usr/share/man/man8/chroot.8
-  sed -i s/\"1\"/\"8\"/1 /usr/share/man/man8/chroot.8
-  
+  sed -i 's/"1"/"8"/' /usr/share/man/man8/chroot.8
   mv -v /usr/bin/{head,nice,sleep,touch} /bin
 }
 
-ch6_55() {
-  ./configure --prefix=/usr
+ch8_53() {
+  ./configure --prefix=/usr --disable-static
   make $JOPT
   make check
-  make docdir=/usr/share/doc/check-0.12.0 install
-  sed -i '1 s/tools/usr/' /usr/bin/checkmk
+  make docdir=/usr/share/doc/check-0.15.2 install
 }
 
-ch6_56() {
+ch8_54() {
   ./configure --prefix=/usr
   make $JOPT
   make check
   make install
 }
 
-ch6_57() {
+ch8_55() {
   sed -i 's/extras//' Makefile.in
   ./configure --prefix=/usr
   make $JOPT
   make check
   make install
-  mkdir -v /usr/share/doc/gawk-5.0.1
-  cp    -v doc/{awkforai.txt,*.{eps,pdf,jpg}} /usr/share/doc/gawk-5.0.1
+  mkdir -v /usr/share/doc/gawk-5.1.0
+  cp    -v doc/{awkforai.txt,*.{eps,pdf,jpg}} /usr/share/doc/gawk-5.1.0
 }
 
-ch6_58() {
-  sed -i 's/test-lock..EXEEXT.//' tests/Makefile.in
-  sed -i 's/IO_ftrylockfile/IO_EOF_SEEN/' gl/lib/*.c
-  sed -i '/unistd/a #include <sys/sysmacros.h>' gl/lib/mountlist.c
-  echo "#define _IO_IN_BACKUP 0x100" >> gl/lib/stdio-impl.h
+ch8_56() {
   ./configure --prefix=/usr --localstatedir=/var/lib/locate
   make $JOPT
-  make check
+  chown -Rv tester .
+  su tester -c "PATH=$PATH make check"
   make install
   mv -v /usr/bin/find /bin
   sed -i 's|find:=${BINDIR}|find:=/bin|' /usr/bin/updatedb
 }
 
-ch6_59() {
+ch8_57() {
   PAGE=letter ./configure --prefix=/usr
   make -j1
   make install
 }
 
-ch6_60() {
+ch8_58() {
   ./configure --prefix=/usr          \
               --sbindir=/sbin        \
               --sysconfdir=/etc      \
@@ -1462,13 +1504,13 @@ ch6_60() {
   mv -v /etc/bash_completion.d/grub /usr/share/bash-completion/completions
 }
 
-ch6_61() {
+ch8_59() {
   ./configure --prefix=/usr --sysconfdir=/etc
   make $JOPT
   make install
 }
 
-ch6_62() {
+ch8_60() {
   ./configure --prefix=/usr
   make $JOPT
   make check
@@ -1476,51 +1518,51 @@ ch6_62() {
   mv -v /usr/bin/gzip /bin
 }
 
-ch6_63() {
+ch8_61() {
   sed -i /ARPD/d Makefile
   rm -fv man/man8/arpd.8
   sed -i 's/.m_ipt.o//' tc/Makefile
   make $JOPT
-  make DOCDIR=/usr/share/doc/iproute2-5.2.0 install
+  make DOCDIR=/usr/share/doc/iproute2-5.8.0 install
 }
 
-ch6_64() {
-  patch -Np1 -i ../kbd-2.2.0-backspace-1.patch
-  sed -i 's/\(RESIZECONS_PROGS=\)yes/\1no/g' configure
+ch8_62() {
+  patch -Np1 -i ../kbd-2.3.0-backspace-1.patch
+  sed -i '/RESIZECONS_PROGS=/s/yes/no/' configure
   sed -i 's/resizecons.8 //' docs/man/man8/Makefile.in
-  PKG_CONFIG_PATH=/tools/lib/pkgconfig ./configure --prefix=/usr --disable-vlock
+  ./configure --prefix=/usr --disable-vlock
   make $JOPT
   make check
   make install
-  mkdir -v       /usr/share/doc/kbd-2.2.0
-  cp -R -v docs/doc/* /usr/share/doc/kbd-2.2.0
+  rm -v /usr/lib/libtswrap.{a,la,so*}
+  mkdir -v            /usr/share/doc/kbd-2.3.0
+  cp -R -v docs/doc/* /usr/share/doc/kbd-2.3.0
 }
 
-ch6_65() {
+ch8_63() {
   ./configure --prefix=/usr
   make $JOPT
   make check
   make install
 }
 
-ch6_66() {
-  sed -i '211,217 d; 219,229 d; 232 d' glob/glob.c
-  ./configure --prefix=/usr
-  make $JOPT
-  make PERL5LIB=$PWD/tests/ check
-  make install
-}
-
-ch6_67() {
+ch8_64() {
   ./configure --prefix=/usr
   make $JOPT
   make check
   make install
 }
 
-ch6_68() {
+ch8_65() {
+  ./configure --prefix=/usr
+  make $JOPT
+  make check
+  make install
+}
+
+ch8_66() {
   ./configure --prefix=/usr                        \
-              --docdir=/usr/share/doc/man-db-2.8.6.1 \
+              --docdir=/usr/share/doc/man-db-2.9.3 \
               --sysconfdir=/etc                    \
               --disable-setuid                     \
               --enable-cache-owner=bin             \
@@ -1534,7 +1576,7 @@ ch6_68() {
   make install
 }
 
-ch6_69() {
+ch8_67() {
   FORCE_UNSAFE_CONFIGURE=1  \
   ./configure --prefix=/usr \
               --bindir=/bin
@@ -1544,7 +1586,7 @@ ch6_69() {
   make -C doc install-html docdir=/usr/share/doc/tar-1.32
 }
 
-ch6_70() {
+ch8_68() {
   ./configure --prefix=/usr --disable-static
   make $JOPT
   make check
@@ -1558,18 +1600,18 @@ ch6_70() {
   popd
 }
 
-ch6_71() {
+ch8_69() {
   echo '#define SYS_VIMRC_FILE "/etc/vimrc"' >> src/feature.h
   ./configure --prefix=/usr
   make $JOPT
-  chown -Rv nobody .
-  su nobody -s /bin/bash -c "LANG=en_US.UTF-8 make -j1 test" &> vim-test.log
+  chown -Rv tester .
+  su tester -c "LANG=en_US.UTF-8 make -j1 test" &> vim-test.log
   make install
   ln -sv vim /usr/bin/vi
   for L in  /usr/share/man/{,*/}man1/vim.1; do
       ln -sv vim.1 $(dirname $L)/vi.1
   done
-  ln -sv ../vim/vim81/doc /usr/share/doc/vim-8.1.1846
+  ln -sv ../vim/vim82/doc /usr/share/doc/vim-8.2.1361
 cat > /etc/vimrc << "EOF"
 " Begin /etc/vimrc
 
@@ -1589,98 +1631,7 @@ endif
 EOF
 }
 
-ch6_72() {
-  ./configure --prefix=/usr                            \
-              --exec-prefix=                           \
-              --libdir=/usr/lib                        \
-              --docdir=/usr/share/doc/procps-ng-3.3.15 \
-              --disable-static                         \
-              --disable-kill
-  make $JOPT
-  sed -i -r 's|(pmap_initname)\\\$|\1|' testsuite/pmap.test/pmap.exp
-  sed -i '/set tty/d' testsuite/pkill.test/pkill.exp
-  rm testsuite/pgrep.test/pgrep.exp
-  make check
-  make install
-  mv -v /usr/lib/libprocps.so.* /lib
-  ln -sfv ../../lib/$(readlink /usr/lib/libprocps.so) /usr/lib/libprocps.so
-}
-
-ch6_73() {
-  mkdir -pv /var/lib/hwclock
-  ./configure ADJTIME_PATH=/var/lib/hwclock/adjtime   \
-              --docdir=/usr/share/doc/util-linux-2.34 \
-              --disable-chfn-chsh  \
-              --disable-login      \
-              --disable-nologin    \
-              --disable-su         \
-              --disable-setpriv    \
-              --disable-runuser    \
-              --disable-pylibmount \
-              --disable-static     \
-              --without-python     \
-              --without-systemd    \
-              --without-systemdsystemunitdir
-  make $JOPT
-  
-  
-  chown -Rv nobody .
-  su nobody -s /bin/bash -c "PATH=$PATH make -k check"
-  
-  make install
-}
-
-ch6_74() {
-  mkdir -v build
-  cd       build
-  ../configure --prefix=/usr           \
-               --bindir=/bin           \
-               --with-root-prefix=""   \
-               --enable-elf-shlibs     \
-               --disable-libblkid      \
-               --disable-libuuid       \
-               --disable-uuidd         \
-               --disable-fsck
-  make $JOPT
-  make check
-  make install
-  make install-libs
-  chmod -v u+w /usr/lib/{libcom_err,libe2p,libext2fs,libss}.a
-  gunzip -v /usr/share/info/libext2fs.info.gz
-  install-info --dir-file=/usr/share/info/dir /usr/share/info/libext2fs.info
-  makeinfo -o      doc/com_err.info ../lib/et/com_err.texinfo
-  install -v -m644 doc/com_err.info /usr/share/info
-  install-info --dir-file=/usr/share/info/dir /usr/share/info/com_err.info
-  cd ..
-}
-
-ch6_75() {
-  sed -i '/Error loading kernel symbols/{n;n;d}' ksym_mod.c
-  sed -i 's/union wait/int/' syslogd.c
-  make $JOPT
-  make BINDIR=/sbin install
-cat > /etc/syslog.conf << "EOF"
-# Begin /etc/syslog.conf
-
-auth,authpriv.* -/var/log/auth.log
-*.*;auth,authpriv.none -/var/log/sys.log
-daemon.* -/var/log/daemon.log
-kern.* -/var/log/kern.log
-mail.* -/var/log/mail.log
-user.* -/var/log/user.log
-*.emerg *
-
-# End /etc/syslog.conf
-EOF
-}
-
-ch6_76() {
-  patch -Np1 -i ../sysvinit-2.95-consolidated-1.patch
-  make $JOPT
-  make install
-}
-
-ch6_77() {
+ch8_70() {
   ./configure --prefix=/usr           \
               --bindir=/sbin          \
               --sbindir=/sbin         \
@@ -1701,71 +1652,161 @@ ch6_77() {
   udevadm hwdb --update
 }
 
-ch6_79_1() {
-save_lib="ld-2.30.so libc-2.30.so libpthread-2.30.so libthread_db-1.0.so"
-
-cd /lib
-
-for LIB in $save_lib; do
-    objcopy --only-keep-debug $LIB $LIB.dbg 
-    strip --strip-unneeded $LIB
-    objcopy --add-gnu-debuglink=$LIB.dbg $LIB 
-done    
-
-save_usrlib="libquadmath.so.0.0.0 libstdc++.so.6.0.27
-             libitm.so.1.0.0 libatomic.so.1.2.0" 
-
-cd /usr/lib
-
-for LIB in $save_usrlib; do
-    objcopy --only-keep-debug $LIB $LIB.dbg
-    strip --strip-unneeded $LIB
-    objcopy --add-gnu-debuglink=$LIB.dbg $LIB
-done
-
-unset LIB save_lib save_usrlib
+ch8_71() {
+  ./configure --prefix=/usr                            \
+              --exec-prefix=                           \
+              --libdir=/usr/lib                        \
+              --docdir=/usr/share/doc/procps-ng-3.3.16 \
+              --disable-static                         \
+              --disable-kill
+  make $JOPT
+  make check
+  make install
+  mv -v /usr/lib/libprocps.so.* /lib
+  ln -sfv ../../lib/$(readlink /usr/lib/libprocps.so) /usr/lib/libprocps.so
 }
 
-ch6_79_2() {
-/tools/bin/find /usr/lib -type f -name \*.a \
-   -exec /tools/bin/strip --strip-debug {} ';'
-
-/tools/bin/find /lib /usr/lib -type f \( -name \*.so* -a ! -name \*dbg \) \
-   -exec /tools/bin/strip --strip-unneeded {} ';'
-
-/tools/bin/find /{bin,sbin} /usr/{bin,sbin,libexec} -type f \
-    -exec /tools/bin/strip --strip-all {} ';'
+ch8_72() {
+  mkdir -pv /var/lib/hwclock
+  ./configure ADJTIME_PATH=/var/lib/hwclock/adjtime   \
+              --docdir=/usr/share/doc/util-linux-2.36 \
+              --disable-chfn-chsh  \
+              --disable-login      \
+              --disable-nologin    \
+              --disable-su         \
+              --disable-setpriv    \
+              --disable-runuser    \
+              --disable-pylibmount \
+              --disable-static     \
+              --without-python     \
+              --without-systemd    \
+              --without-systemdsystemunitdir
+  make $JOPT
+  chown -Rv tester .
+  su tester -c "make -k check"
+  make install
 }
 
-ch6_80_1() {
+ch8_73() {
+  mkdir -v build
+  cd       build
+  ../configure --prefix=/usr           \
+               --bindir=/bin           \
+               --with-root-prefix=""   \
+               --enable-elf-shlibs     \
+               --disable-libblkid      \
+               --disable-libuuid       \
+               --disable-uuidd         \
+               --disable-fsck
+  make $JOPT
+  make check
+  make install
+  chmod -v u+w /usr/lib/{libcom_err,libe2p,libext2fs,libss}.a
+  gunzip -v /usr/share/info/libext2fs.info.gz
+  install-info --dir-file=/usr/share/info/dir /usr/share/info/libext2fs.info
+  makeinfo -o      doc/com_err.info ../lib/et/com_err.texinfo
+  install -v -m644 doc/com_err.info /usr/share/info
+  install-info --dir-file=/usr/share/info/dir /usr/share/info/com_err.info
+  cd ..
+}
+
+ch8_74() {
+  sed -i '/Error loading kernel symbols/{n;n;d}' ksym_mod.c
+  sed -i 's/union wait/int/' syslogd.c
+  make $JOPT
+  make BINDIR=/sbin install
+cat > /etc/syslog.conf << "EOF"
+# Begin /etc/syslog.conf
+
+auth,authpriv.* -/var/log/auth.log
+*.*;auth,authpriv.none -/var/log/sys.log
+daemon.* -/var/log/daemon.log
+kern.* -/var/log/kern.log
+mail.* -/var/log/mail.log
+user.* -/var/log/user.log
+*.emerg *
+
+# End /etc/syslog.conf
+EOF
+}
+
+ch8_75() {
+  patch -Np1 -i ../sysvinit-2.97-consolidated-1.patch
+  make $JOPT
+  make install
+}
+
+ch8_77() {
+  save_lib="ld-2.32.so libc-2.32.so libpthread-2.32.so libthread_db-1.0.so"
+
+  cd /lib
+
+  for LIB in $save_lib; do
+      objcopy --only-keep-debug $LIB $LIB.dbg 
+      strip --strip-unneeded $LIB
+      objcopy --add-gnu-debuglink=$LIB.dbg $LIB 
+  done    
+
+  save_usrlib="libquadmath.so.0.0.0 libstdc++.so.6.0.28
+               libitm.so.1.0.0 libatomic.so.1.2.0" 
+
+  cd /usr/lib
+
+  for LIB in $save_usrlib; do
+      objcopy --only-keep-debug $LIB $LIB.dbg
+      strip --strip-unneeded $LIB
+      objcopy --add-gnu-debuglink=$LIB.dbg $LIB
+  done
+
+  unset LIB save_lib save_usrlib
+
+  find /usr/lib -type f -name \*.a \
+     -exec strip --strip-debug {} ';'
+
+  find /lib /usr/lib -type f -name \*.so* ! -name \*dbg \
+     -exec strip --strip-unneeded {} ';'
+
+  find /{bin,sbin} /usr/{bin,sbin,libexec} -type f \
+      -exec strip --strip-all {} ';'
+}
+
+ch8_78_1() {
   rm -rf /tmp/*
+  logout
 }
 
-ch6_80_2() {
+ch8_78_2() {
+  chroot "$LFS" /usr/bin/env -i          \
+      HOME=/root TERM="$TERM"            \
+      PS1='(lfs chroot) \u:\w\$ '        \
+      PATH=/bin:/usr/bin:/sbin:/usr/sbin \
+      /bin/bash --login
+}
+
+ch8_78_3() {
   rm -f /usr/lib/lib{bfd,opcodes}.a
+  rm -f /usr/lib/libctf{,-nobfd}.a
   rm -f /usr/lib/libbz2.a
   rm -f /usr/lib/lib{com_err,e2p,ext2fs,ss}.a
   rm -f /usr/lib/libltdl.a
   rm -f /usr/lib/libfl.a
   rm -f /usr/lib/libz.a
   find /usr/lib /usr/libexec -name \*.la -delete
+  find /usr -depth -name $(uname -m)-lfs-linux-gnu\* | xargs rm -rf
+  rm -rf /tools
+  userdel -r tester
 }
 
-ch7_2() {
-  PK="lfs-bootscripts-20190524"; EXT=".tar.xz";
-  cd /sources
-  tar -xf $PK$EXT
-  cd $PK
+ch9_2() {
   make install
-  cd ..
-  rm -rf $PK
 }
 
-ch7_4() {
+ch9_4() {
   bash /lib/udev/init-net-rules.sh
+  cat /etc/udev/rules.d/70-persistent-net.rules
 }
 
-ch7_5() {
+ch9_5() {
 cd /etc/sysconfig/
 cat > ifconfig."$IFACE" << EOF
 ONBOOT=yes
@@ -1779,6 +1820,7 @@ EOF
 
 cat > /etc/resolv.conf << "EOF"
 # Begin /etc/resolv.conf
+#domain lfsbox
 nameserver 8.8.8.8
 nameserver 8.8.4.4
 # End /etc/resolv.conf
@@ -1787,7 +1829,7 @@ EOF
 echo "lfsbox" > /etc/hostname
 
 cat > /etc/hosts << "EOF"
-127.0.0.1 localhost
+127.0.0.1 localhost.localdomain localhost
 127.0.1.1 lfsbox
 ::1       localhost ip6-localhost ip6-loopback
 ff02::1   ip6-allnodes
@@ -1795,7 +1837,7 @@ ff02::2   ip6-allrouters
 EOF
 }
 
-ch7_6() {
+ch9_6() {
 cat > /etc/inittab << "EOF"
 # Begin /etc/inittab
 
@@ -1838,13 +1880,13 @@ CLOCKPARAMS=
 EOF
 }
 
-ch7_7() {
+ch9_7() {
 cat > /etc/profile <<"EOF"
 export LANG=en_US.UTF-8
 EOF
 }
 
-ch7_8() {
+ch9_8() {
 cat > /etc/inputrc << "EOF"
 # Begin /etc/inputrc
 # Modified by Chris Lynn <roryo@roryo.dynup.net>
@@ -1890,22 +1932,22 @@ set bell-style none
 EOF
 }
 
-ch7_9() {
+ch9_9() {
 cat > /etc/shells << "EOF"
 /bin/sh
 /bin/bash
 EOF
 }
 
-ch8_2() {
+ch10_2() {
 cat > /etc/fstab << EOF
 # Begin /etc/fstab
 
 # file system  mount-point  type     options             dump  fsck
 #                                                              order
 
-${LFSPART}       /            ext4    defaults            1     1
-${SWAPPART}     swap         swap     pri=1               0     0
+${LFSPART}     /             ext4    defaults            1     1
+${SWAPPART}    swap         swap     pri=1               0     0
 proc           /proc        proc     nosuid,noexec,nodev 0     0
 sysfs          /sys         sysfs    nosuid,noexec,nodev 0     0
 devpts         /dev/pts     devpts   gid=5,mode=620      0     0
@@ -1916,20 +1958,17 @@ devtmpfs       /dev         devtmpfs mode=0755,nosuid    0     0
 EOF
 }
 
-ch8_3() {
-cd /sources
-tar -xf linux-5.2.8.tar.xz
-cd linux-5.2.8
-
+ch10_3() {
 make mrproper
-make menuconfig
+#make menuconfig
+cp /sources/lfs/src/.config .config
 make
 make modules_install
-cp -iv arch/x86/boot/bzImage /boot/vmlinuz-5.2.8-lfs-9.0
-cp -iv System.map /boot/System.map-5.2.8
-cp -iv .config /boot/config-5.2.8
-install -d /usr/share/doc/linux-5.2.8
-cp -r Documentation/* /usr/share/doc/linux-5.2.8
+cp -iv arch/x86/boot/bzImage /boot/vmlinuz-5.8.3-lfs-10.0
+cp -iv System.map /boot/System.map-5.8.3
+cp -iv .config /boot/config-5.8.3
+install -d /usr/share/doc/linux-5.8.3
+cp -r Documentation/* /usr/share/doc/linux-5.8.3
 install -v -m755 -d /etc/modprobe.d
 cat > /etc/modprobe.d/usb.conf << "EOF"
 # Begin /etc/modprobe.d/usb.conf
@@ -1939,12 +1978,9 @@ install uhci_hcd /sbin/modprobe ehci_hcd ; /sbin/modprobe -i uhci_hcd ; true
 
 # End /etc/modprobe.d/usb.conf
 EOF
-
-cd ..
-rm -rf linux-5.2.8
 }
 
-ch8_4() {
+ch10_4() {
 grub-install /dev/"${DSK}"
 
 cat > /boot/grub/grub.cfg << EOF
@@ -1954,23 +1990,30 @@ set timeout=5
 insmod ext2
 set root=(hd0,2)
 
-menuentry "GNU/Linux, Linux 5.2.8-lfs-9.0" {
-	linux /boot/vmlinuz-5.2.8-lfs-9.0 root=/dev/${DSK}${DSK2} ro
+menuentry "GNU/Linux, Linux 5.8.3-lfs-10.0" {
+	linux /boot/vmlinuz-5.8.3-lfs-10.0 root=/dev/${DSK}${DSK2} ro
 }
 EOF
 }
 
-ch9_1() {
-echo 9.0 > /etc/lfs-release
+ch11_1() {
+echo 10.0 > /etc/lfs-release
 cat > /etc/lsb-release << "EOF"
 DISTRIB_ID="Linux From Scratch"
-DISTRIB_RELEASE="9.0"
+DISTRIB_RELEASE="10.0"
 DISTRIB_CODENAME="badidea"
 DISTRIB_DESCRIPTION="Linux From Scratch"
 EOF
+cat > /etc/os-release << "EOF"
+NAME="Linux From Scratch"
+VERSION="10.0"
+ID=lfs
+PRETTY_NAME="Linux From Scratch 10.0"
+VERSION_CODENAME="badidea"
+EOF
 }
 
-dhcpcd() {
+dhcpcd_8_0_3() {
 ./configure --libexecdir=/lib/dhcpcd \
             --dbdir=/var/lib/dhcpcd  &&
 make
@@ -1994,7 +2037,7 @@ DHCP_STOP="-k"
 EOF
 }
 
-wget() {
+wget_1_20_3() {
 ./configure --prefix=/usr      \
             --sysconfdir=/etc  \
             --with-ssl=openssl &&
@@ -2002,7 +2045,7 @@ make
 make install
 }
 
-openssh() {
+openssh_8_0p1() {
 # TODO: Run install, chown groupadd, useradd as root
 install  -v -m700 -d /var/lib/sshd &&
 chown    -v root:sys /var/lib/sshd &&
@@ -2028,61 +2071,63 @@ install -v -m644    INSTALL LICENCE OVERVIEW README* \
                     /usr/share/doc/openssh-8.0p1
 }
 
-ch9_3() {
+ch11_3_1() {
   cd /sources
-case "$1" in
-  1)
-    # Install dhcpcd as described in Ch. 14 of BLFS
-    bs dhcpcd dhcpcd-8.0.3 .tar.xz
-    ;;
-  2)
-    # Install wget as described in Ch 15. of BLFS
-    bs wget wget-1.20.3 .tar.gz
-    ;;
-  3)
-  # Install openssh as described in Ch 15. of BLFS
-  bs openssh openssh-8.0p1 .tar.gz
-  ;;
+  case "$1" in
+  1) bs dhcpcd_8_0_3 dhcpcd-8.0.3 .tar.xz ;; # BLFS Ch. 14
+  2) bs wget_1_20_3 wget-1.20.3 .tar.gz ;; # BLFS Ch. 15
+  3) bs openssh_8_0p1 openssh-8.0p1 .tar.gz ;; # BLFS Ch. 15
   *) 
     for i in {1..3}
     do
-      #bash $LFS/sources/lfs/src/lfs3.sh $i
-      stage3 $i
+      ch11_3_1 $i
     done
     ;;
-esac
-  #logout
+  esac
 }
 
-# compile source
-cs() { # package, extension, chapternum
-  PK=$1; EXT=$2; NUM=$3;
-  tar -xf $LFS/sources/$PK$EXT
-  cd $PK
-  ch5_$NUM >$LP/5.$NUM.log 2>$LP/5.$NUM.err
-  cd ..
-  rm -rf $PK
+ch11_3_2() {
+  logout
+}
+
+ch11_3_3() {
+  umount -v $LFS/dev/pts
+  umount -v $LFS/dev
+  umount -v $LFS/run
+  umount -v $LFS/proc
+  umount -v $LFS/sys
+  umount -v $LFS/usr
+  umount -v $LFS/home
+  umount -v $LFS
+  umount -v $LFS
+}
+
+ch11_3_4() {
+  shutdown -r now
 }
 
 # compile source
 bs() { # package, extension, chapternum
-  PK=$2; EXT=$3; NUM=$1;
-  tar -xf /sources/$PK$EXT
+  PK=$2; EXT=$3; NUM=$1; BD=$4;
+  cd $BD/sources
+  tar -xf $BD/sources/$PK$EXT
   cd $PK
   $NUM >$LP/$NUM.log 2>$LP/$NUM.err
-  cd ..
+  cd $BD/sources
   rm -rf $PK
 }
 
 stage0() {
   if [ $SYS = "ubuntu" ]; then
-    sudo sed -i '/ focal /s/$/ universe multiverse/' /etc/apt/sources.list
+    sudo sed -i '/archive.ubuntu.com\/ubuntu\/ focal /s/$/ universe multiverse/' /etc/apt/sources.list
+    sudo apt update
   fi
   # This script seeks to set up a system for lfs
   wget http://jcantrell.me/jordan/files/setup/jopm/jopm.sh
   # Run basic workstation setup
   sh jopm.sh usecase minimumcore
   sh jopm.sh install valgrind
+  sh jopm.sh install git
   if [ $SYS = "tinycore" ]; then
     # Blindly clobber sh and make it a link to bash
     sudo rm /bin/sh
@@ -2103,8 +2148,7 @@ stage1() {
   ch2_7
   ch3_1
   ch4_2
-  ch4_3_1
-  ch4_3_2
+  ch4_3
 }
 
 stage2() {
@@ -2114,194 +2158,236 @@ stage2() {
 stage3() {
 cd $LFS/sources
 case "$1" in
-  4) { time cs binutils-2.32 .tar.xz 4; } 2> $LP/sbu ;;
-  5) cs gcc-9.2.0       .tar.xz 5 ;;
-  6) cs linux-5.2.8     .tar.xz 6 ;;
-  7) cs glibc-2.30      .tar.xz 7 ;;
-  8) cs gcc-9.2.0       .tar.xz 8 ;;
-  9) cs binutils-2.32   .tar.xz 9 ;;
-  10) cs gcc-9.2.0       .tar.xz 10 ;;
-  11) cs tcl8.6.9    -src.tar.gz 11 ;;
-  12) cs expect5.45.4    .tar.gz 12 ;;
-  13) cs dejagnu-1.6.2   .tar.gz 13 ;;
-  14) cs m4-1.4.18       .tar.xz 14 ;;
-  15) cs ncurses-6.1     .tar.gz 15 ;;
-  16) cs bash-5.0        .tar.gz 16 ;;
-  17) cs bison-3.4.1     .tar.xz 17 ;;
-  18) cs bzip2-1.0.8     .tar.gz 18 ;;
-  19) cs coreutils-8.31  .tar.xz 19 ;;
-  20) cs diffutils-3.7   .tar.xz 20 ;;
-  21) cs file-5.37       .tar.gz 21 ;;
-  22) cs findutils-4.6.0 .tar.gz 22 ;;
-  23) cs gawk-5.0.1      .tar.xz 23 ;;
-  24) cs gettext-0.20.1  .tar.xz 24 ;;
-  25) cs grep-3.3        .tar.xz 25 ;;
-  26) cs gzip-1.10       .tar.xz 26 ;;
-  27) cs make-4.2.1      .tar.gz 27 ;;
-  28) cs patch-2.7.6     .tar.xz 28 ;;
-  29) cs perl-5.30.0     .tar.xz 29 ;;
-  30) cs Python-3.7.4    .tar.xz 30 ;;
-  31) cs sed-4.7         .tar.xz 31 ;;
-  32) cs tar-1.32        .tar.xz 32 ;;
-  33) cs texinfo-6.6     .tar.xz 33 ;;
-  34) cs xz-5.2.4        .tar.xz 34 ;;
-  35) ch5_35 >$LP/5.35.log 2>$LP/5.35.err ;;
+  2) { time bs ch5_2 binutils-2.35 .tar.xz $LFS; } 2> $LP/sbu ;;
+  3) bs ch5_3 gcc-10.2.0       .tar.xz $LFS ;;
+  4) bs ch5_4 linux-5.8.3      .tar.xz $LFS ;;
+  5) bs ch5_5 glibc-2.32       .tar.xz $LFS ;;
+  6) bs ch5_6 gcc-10.2.0       .tar.xz $LFS ;;
   *) 
-    for i in {4..36}
+    for i in {2..6}
     do
-      #bash $LFS/sources/lfs/src/lfs3.sh $i
       stage3 $i
     done
     ;;
-esac
+  esac
 }
 
 stage4() {
-  ch5_36
-  ch6_2
+  cd $LFS/sources
+  case "$1" in
+  2)  bs ch6_2  m4-1.4.18       .tar.xz $LFS ;;
+  3)  bs ch6_3  ncurses-6.2     .tar.gz $LFS ;;
+  4)  bs ch6_4  bash-5.0        .tar.gz $LFS ;;
+  5)  bs ch6_5  coreutils-8.32  .tar.xz $LFS ;;
+  6)  bs ch6_6  diffutils-3.7   .tar.xz $LFS ;;
+  7)  bs ch6_7  file-5.39       .tar.gz $LFS ;;
+  8)  bs ch6_8  findutils-4.7.0 .tar.xz $LFS ;;
+  9)  bs ch6_9  gawk-5.1.0      .tar.xz $LFS ;;
+  10) bs ch6_10 grep-3.4        .tar.xz $LFS ;;
+  11) bs ch6_11 gzip-1.10       .tar.xz $LFS ;;
+  12) bs ch6_12 make-4.3        .tar.gz $LFS ;;
+  13) bs ch6_13 patch-2.7.6     .tar.xz $LFS ;;
+  14) bs ch6_14 sed-4.8         .tar.xz $LFS ;;
+  15) bs ch6_15 tar-1.32        .tar.xz $LFS ;;
+  16) bs ch6_16 xz-5.2.5        .tar.xz $LFS ;;
+  17) bs ch6_17 binutils-2.35   .tar.xz $LFS ;;
+  18) bs ch6_18 gcc-10.2.0      .tar.xz $LFS ;;
+  *) 
+    for i in {2..18}
+    do
+      stage4 $i
+    done
+    ;;
+  esac
 }
 
 stage5() {
-  ch6_4
+  ch7_2
+  ch7_3
+}
+
+stage5_2() {
+  ch7_4
 }
 
 stage6() {
-  ch6_5
-  ch6_6_1
+  ch7_5
+  ch7_6_1
 }
 
-stage7_1() {
-set +e
-cd /sources
-ch6_6_2
-bs ch6_7 linux-5.2.8    .tar.xz
-bs ch6_8 man-pages-5.02 .tar.xz
-bs ch6_9 glibc-2.30     .tar.xz
-ch6_10
-bs ch6_11 zlib-1.2.11   .tar.xz
-bs ch6_12 file-5.37     .tar.gz
-bs ch6_13 readline-8.0  .tar.gz
-bs ch6_14 m4-1.4.18     .tar.xz
-bs ch6_15 bc-2.1.3      .tar.gz
-bs ch6_16 binutils-2.32 .tar.xz
-bs ch6_17 gmp-6.1.2     .tar.xz
-bs ch6_18 mpfr-4.0.2    .tar.xz
-bs ch6_19 mpc-1.1.0     .tar.gz
-bs ch6_20 shadow-4.7    .tar.xz
-bash /sources/lfs/src/lfs.sh stage7_2
+stage6_2() {
+  ch7_6_2
+}
+
+stage7() {
+  cd /sources
+  case "$1" in
+  7)  bs ch7_7  gcc-10.2.0      .tar.xz $LFS ;;
+  8)  bs ch7_8  gettext-0.21    .tar.xz $LFS ;;
+  9)  bs ch7_9  bison-3.7.1     .tar.xz $LFS ;;
+  10) bs ch7_10 perl-5.32.0     .tar.xz $LFS ;;
+  11) bs ch7_11 Python-3.8.5    .tar.xz $LFS ;;
+  12) bs ch7_12 texinfo-6.7     .tar.xz $LFS ;;
+  13) bs ch7_13 util-linux-2.36 .tar.xz $LFS ;;
+  14) ch7_14_1 ;;
+  *) 
+    for i in {7..14}
+    do
+      stage7 $i
+    done
+    ;;
+  esac
 }
 
 stage7_2() {
-set +e
-cd /sources
-bs ch6_21 gcc-9.2.0     .tar.xz
-bs ch6_22 bzip2-1.0.8   .tar.gz
-bs ch6_23 pkg-config-0.29.2 .tar.gz
-bs ch6_24 ncurses-6.1   .tar.gz
-bs ch6_25 attr-2.4.48   .tar.gz
-bs ch6_26 acl-2.2.53    .tar.gz
-bs ch6_27 libcap-2.27   .tar.xz
-bs ch6_28 sed-4.7       .tar.xz
-bs ch6_29 psmisc-23.2   .tar.xz
-bs ch6_30 iana-etc-2.30 .tar.bz2
-bs ch6_31 bison-3.4.1   .tar.xz
-bs ch6_32 flex-2.6.4    .tar.gz
-bs ch6_33 grep-3.3      .tar.xz
-bs ch6_34 bash-5.0      .tar.gz
+  ch7_14_2
 }
 
 stage8() {
   set +e
-  cd /sources
+  cd $LFS/sources
   case "$1" in
-    35) bs ch6_35 libtool-2.4.6   .tar.xz ;;
-    36) bs ch6_36 gdbm-1.18.1     .tar.gz ;;
-    37) bs ch6_37 gperf-3.1       .tar.gz ;;
-    38) bs ch6_38 expat-2.2.7     .tar.xz ;;
-    39) bs ch6_39 inetutils-1.9.4 .tar.xz ;;
-    40) bs ch6_40 perl-5.30.0     .tar.xz ;;
-    41) bs ch6_41 XML-Parser-2.44 .tar.gz ;;
-    42) bs ch6_42 intltool-0.51.0 .tar.gz ;;
-    43) bs ch6_43 autoconf-2.69   .tar.xz ;;
-    44) bs ch6_44 automake-1.16.1 .tar.xz ;;
-    45) bs ch6_45 xz-5.2.4        .tar.xz ;;
-    46) bs ch6_46 kmod-26         .tar.xz ;;
-    47) bs ch6_47 gettext-0.20.1  .tar.xz ;;
-    48) bs ch6_48 elfutils-0.177  .tar.bz2 ;;
-    49) bs ch6_49 libffi-3.2.1    .tar.gz ;;
-    50) bs ch6_50 openssl-1.1.1c  .tar.gz ;;
-    51) bs ch6_51 Python-3.7.4    .tar.xz ;;
-    52) bs ch6_52 ninja-1.9.0     .tar.gz ;;
-    53) bs ch6_53 meson-0.51.1    .tar.gz ;;
-    54) bs ch6_54 coreutils-8.31  .tar.xz ;;
-    55) bs ch6_55 check-0.12.0    .tar.gz ;;
-    56) bs ch6_56 diffutils-3.7   .tar.xz ;;
-    57) bs ch6_57 gawk-5.0.1      .tar.xz ;;
-    58) bs ch6_58 findutils-4.6.0 .tar.gz ;;
-    59) bs ch6_59 groff-1.22.4    .tar.gz ;;
-    60) bs ch6_60 grub-2.04       .tar.xz ;;
-    61) bs ch6_61 less-551        .tar.gz ;;
-    62) bs ch6_62 gzip-1.10       .tar.xz ;;
-    63) bs ch6_63 iproute2-5.2.0  .tar.xz ;;
-    64) bs ch6_64 kbd-2.2.0       .tar.xz ;;
-    65) bs ch6_65 libpipeline-1.5.1 .tar.gz ;;
-    66) bs ch6_66 make-4.2.1      .tar.gz ;;
-    67) bs ch6_67 patch-2.7.6     .tar.xz ;;
-    68) bs ch6_68 man-db-2.8.6.1  .tar.xz ;;
-    69) bs ch6_69 tar-1.32        .tar.xz ;;
-    70) bs ch6_70 texinfo-6.6     .tar.xz ;;
-    71) bs ch6_71 vim-8.1.1846    .tar.gz ;;
-    72) bs ch6_72 procps-ng-3.3.15 .tar.xz ;;
-    73) bs ch6_73 util-linux-2.34 .tar.xz ;;
-    74) bs ch6_74 e2fsprogs-1.45.3 .tar.gz ;;
-    75) bs ch6_75 sysklogd-1.5.1 .tar.gz ;;
-    76) bs ch6_76 sysvinit-2.95  .tar.xz ;;
-    77) bs ch6_77 eudev-3.2.8    .tar.gz ;;
+    3)  bs ch8_3  man-pages-5.08    .tar.xz ;;
+    4)  bs ch8_4  tcl8.6.10     -src.tar.gz ;;
+    5)  bs ch8_5  expect5.45.4      .tar.gz ;;
+    6)  bs ch8_6  dejagnu-1.6.2     .tar.gz ;;
+    7)  bs ch8_7  iana-etc-20200821 .tar.gz ;;
+    8)  bs ch8_8  glibc-2.32        .tar.xz ;;
+    9)  bs ch8_9  zlib-1.2.11       .tar.xz ;;
+    10) bs ch8_10 bzip2-1.0.8       .tar.gz ;;
+    11) bs ch8_11 xz-5.2.5          .tar.xz ;;
+    12) bs ch8_12 zstd-1.4.5        .tar.gz ;;
+    13) bs ch8_13 file-5.39         .tar.gz ;;
+    14) bs ch8_14 readline-8.0      .tar.gz ;;
+    15) bs ch8_15 m4-1.4.18         .tar.xz ;;
+    16) bs ch8_16 bc-3.1.5          .tar.xz ;;
+    17) bs ch8_17 flex-2.6.4        .tar.gz ;;
+    18) bs ch8_18 binutils-2.35     .tar.xz ;;
+    19) bs ch8_19 gmp-6.2.0         .tar.xz ;;
+    20) bs ch8_20 mpfr-4.1.0        .tar.xz ;;
+    21) bs ch8_21 mpc-1.1.0         .tar.gz ;;
+    22) bs ch8_22 attr-2.4.48       .tar.gz ;;
+    23) bs ch8_23 acl-2.2.53        .tar.gz ;;
+    24) bs ch8_24 libcap-2.42       .tar.xz ;;
+    25) bs ch8_25 shadow-4.8.1      .tar.xz ;;
+    26) bs ch8_26 gcc-10.2.0        .tar.xz ;;
+    27) bs ch8_27 pkg-config-0.29.2 .tar.gz ;;
+    28) bs ch8_28 ncurses-6.2       .tar.gz ;;
+    29) bs ch8_29 sed-4.8           .tar.xz ;;
+    30) bs ch8_30 psmisc-23.3       .tar.xz ;;
+    31) bs ch8_31 gettext-0.21      .tar.xz ;;
+    32) bs ch8_32 bison-3.7.1        .tar.xz ;;
+    33) bs ch8_33 grep-3.4          .tar.xz ;;
+    34) bs ch8_34 bash-5.0          .tar.gz ;;
     *) 
-      for i in {35..77}
+      for i in {3..34}
       do
-        #bash $LFS/sources/lfs/src/lfs3.sh $i
         stage8 $i
       done
-      ch6_79_1
       ;;
   esac
 }
 
+stage8_1() {
+  ch8_34_1
+}
+
+stage8_2() {
+  set +e
+  cd $LFS/sources
+  case "$1" in
+    35) bs ch8_35 libtool-2.4.6     .tar.xz ;;
+    36) bs ch8_36 gdbm-1.18.1       .tar.gz ;;
+    37) bs ch8_37 gperf-3.1         .tar.gz ;;
+    38) bs ch8_38 expat-2.2.9       .tar.xz ;;
+    39) bs ch8_39 inetutils-1.9.4   .tar.xz ;;
+    40) bs ch8_40 perl-5.32.0       .tar.xz ;;
+    41) bs ch8_41 XML-Parser-2.46   .tar.gz ;;
+    42) bs ch8_42 intltool-0.51.0   .tar.gz ;;
+    43) bs ch8_43 autoconf-2.69     .tar.xz ;;
+    44) bs ch8_44 automake-1.16.2   .tar.xz ;;
+    45) bs ch8_45 kmod-27           .tar.xz ;;
+    46) bs ch8_46 elfutils-0.180    .tar.bz2 ;;
+    47) bs ch8_47 libffi-3.3        .tar.gz ;;
+    48) bs ch8_48 openssl-1.1.1g    .tar.gz ;;
+    49) bs ch8_49 Python-3.8.5      .tar.xz ;;
+    50) bs ch8_50 ninja-1.10.0      .tar.gz ;;
+    51) bs ch8_51 meson-0.55.0      .tar.gz ;;
+    52) bs ch8_52 coreutils-8.32    .tar.xz ;;
+    53) bs ch8_53 check-0.15.2      .tar.gz ;;
+    54) bs ch8_54 diffutils-3.7     .tar.xz ;;
+    55) bs ch8_55 gawk-5.1.0        .tar.xz ;;
+    56) bs ch8_56 findutils-4.7.0   .tar.xz ;;
+    57) bs ch8_57 groff-1.22.4      .tar.gz ;;
+    58) bs ch8_58 grub-2.04         .tar.xz ;;
+    59) bs ch8_59 less-551          .tar.gz ;;
+    60) bs ch8_60 gzip-1.10         .tar.xz ;;
+    61) bs ch8_61 iproute2-5.8.0    .tar.xz ;;
+    62) bs ch8_62 kbd-2.3.0         .tar.xz ;;
+    63) bs ch8_63 libpipeline-1.5.3 .tar.gz ;;
+    64) bs ch8_64 make-4.3          .tar.gz ;;
+    65) bs ch8_65 patch-2.7.6       .tar.xz ;;
+    66) bs ch8_66 man-db-2.9.3      .tar.xz ;;
+    67) bs ch8_67 tar-1.32          .tar.xz ;;
+    68) bs ch8_68 texinfo-6.7       .tar.xz ;;
+    69) bs ch8_69 vim-8.2.1361      .tar.gz ;;
+    70) bs ch8_70 eudev-3.2.9       .tar.gz ;;
+    71) bs ch8_71 procps-ng-3.3.16  .tar.xz ;;
+    72) bs ch8_72 util-linux-2.36   .tar.xz ;;
+    73) bs ch8_73 e2fsprogs-1.45.6  .tar.gz ;;
+    74) bs ch8_74 sysklogd-1.5.1    .tar.gz ;;
+    75) bs ch8_75 sysvinit-2.97     .tar.xz ;;
+    77) ch8_77 ;;
+    78) ch8_78_1 ;;
+    *) 
+      for i in {35..75}
+      do
+        stage8_2 $i
+      done
+      stage8_2 77
+      stage8_2 78
+      ;;
+  esac
+}
+
+stage8_3() {
+  ch8_78_2
+}
+
+stage8_4() {
+  ch8_78_3
+}
+
 stage9() {
-ch6_79_2
-ch6_80_1
+  bs ch9_2 lfs-bootscripts-20200818 .tar.xz
+  ch9_4
+  ch9_5
+  ch9_6
+  ch9_7
+  ch9_8
+  ch9_9
+  ch10_2
+  bs ch10_3 linux-5.8.3 .tar.xz
+  ch10_4
+  ch11_1
+  ch11_3_1
+  ch11_3_2
 }
 
-stage11() {
-  ch6_80_2
-  ch7_2
-  ch7_4
-  ch7_5
-  ch7_6
-  ch7_7
-  ch7_8
-  ch7_9
-  ch8_2
-  ch8_3
-  ch8_4
-  ch9_1
-  ch9_3
+stage10() {
+  ch11_3_3
+  ch11_3_4
 }
 
-stage12() {
+clean() {
   umount -v $LFS/dev/pts
   umount -v $LFS/dev
   umount -v $LFS/run
   umount -v $LFS/proc
   umount -v $LFS/sys
   umount -v $LFS
-  shutdown -r now
-}
-
-clean() {
   swapoff /dev/${DSK}${DSK1}
-  umount /dev/${DSK}${DSK2}
+  dd if=/dev/zero of=/dev/${DSK}${DSK2} bs=1M count=1
 sed -e 's/\s*\([\+0-9a-zA-Z]*\).*/\1/' << EOF | fdisk /dev/$DSK
   d   # delete partition
       # default
@@ -2310,7 +2396,21 @@ sed -e 's/\s*\([\+0-9a-zA-Z]*\).*/\1/' << EOF | fdisk /dev/$DSK
   w   #
 EOF
   userdel -r lfs
-  rm /tools
 }
 
-$1 $7
+restoreBackup() {
+  ch7_14_3
+  ch7_3
+  ch7_4
+}
+
+initchroot() {
+  ch2_7 # mount $LFS
+  ch7_3 # mount virtual filesystems
+}
+
+finalchroot() {
+  ch8_78_2
+}
+
+$1 $8

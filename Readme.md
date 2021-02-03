@@ -1,63 +1,74 @@
 This project attempts to automate the Linux From Scratch project.
-Currently follows version 9.0 of LFS.
+Currently follows version 10.0 of LFS.
+
+Usage:
+`lfs.sh stage-or-chapter host drive swappartnum installpartnum threads`
 
 Step 0: Prepare host system and temporary tools  
-Approximate time on dual-core Ubuntu server vm in libvirt: 62 minutes  
-Approximate time on quad-core Ubuntu desktop vm in virtualbo, 23GB: 50 minutes  
-Approximate time on quad-core Ubuntu chroot: 41 minutes  
-`$ wget http://jcantrell.me:8002/jcantrell/lfs/raw/$BRANCH/src/lfs.sh`  
-`$ export LFS=/mnt/lfs
-`$ sh lfs.sh stage0 ubuntu sda 1 2`   
-`$ bash $LFS/sources/lfs/src/lfs.sh stage2`
-`$ time bash $LFS/sources/lfs/src/lfs.sh stage3`
-Sometimes perl fails, especially on qemu on hudson. Specify one job at a time:
-`$ time bash $LFS/sources/lfs/src/lfs.sh stage3 ubuntu sda 1 2 1`
+`(system root) # wget http://jcantrell.me:8002/jcantrell/lfs/raw/$BRANCH/src/lfs.sh`  
+`(system root) # export LFS=/mnt/lfs
+`(system root) # sh lfs.sh stage0 ubuntu sda 1 2`   
+`(lfs user) $ bash $LFS/sources/lfs/src/lfs.sh stage2`
+`(lfs user) $ time bash $LFS/sources/lfs/src/lfs.sh stage3 ubuntu sda 1 2 1`
+`$ time bash $LFS/sources/lfs/src/lfs.sh stage4`  
+`$ exit`
+`$ exit`
+`(system root) # bash $LFS/sources/lfs/src/lfs.sh stage5`  
 
-Step 4: Prepare nodes as root  
-`$ exit`  
-`$ exit`  
-`# export LFS=/mnt/lfs`  
-`# bash $LFS/sources/lfs/src/lfs.sh stage4`  
-
-Step 5: Change to chroot environment (source the script so it will see
-  environment variables)  
-`# . $LFS/sources/lfs/src/lfs.sh stage5`  
+Step 5: Change to chroot environment
+`(system root) # bash $LFS/sources/lfs/src/lfs.sh stage5_2`  
 
 Step 6: Run new bash  
-`# bash /sources/lfs/src/lfs.sh stage6`  
+`(chroot) # bash /sources/lfs/src/lfs.sh stage6`  
+`(new bash chroot) # bash /sources/lfs/src/lfs.sh stage6_2`
 
 Step 7: Begin building sources  
-Approximate time on single-core Ubuntu desktop vm in virtualbox: 237 minutes  
-`# date` Run date just to give you an idea of when you started, and when it should be done  
-Approximate time on quad-core Ubuntu desktop vm in virtualbox, 23GB: 68 minutes  
-Approximate time on quad-core Ubuntu chroot: 70m
-Approximate time on 16-core Ubuntu chroot: 44m
-`# time bash /sources/lfs/src/lfs.sh stage7_1`  
-`# exec /bin/bash --login +h`
+`(chroot) # time bash /sources/lfs/src/lfs.sh stage7`  
+
+Step 7.2 (optional): Exit chroot to make a backup, then re-enter the chroot
+exit chroot
+`# exit`
+`# exit`
+`# time bash $LFS/sources/lfs/src/lfs.sh stage7_2`  
+# Remount the kernel virtual filesystem
+`# bash $LFS/sources/lfs/src/lfs.sh ch7_3`
+# Re-enter the chroot environment
+`# bash $LFS/sources/lfs/src/lfs.sh ch7_4`
 
 Step 8: Build the rest of the packages with the bash we just built  
-Approximate time on quad-core Ubuntu chroot: 110 minutes  
-Approximate time on quad-core Ubuntu virtualbox vm: 80 minutes  
-`# time bash /sources/lfs/src/lfs.sh stage8`  
+`(chroot) # time bash /sources/lfs/src/lfs.sh stage8`  # Build
+`(chroot) # bash /sources/lfs/src/lfs.sh stage8_1`  # Run new bash
+`(new bash) # time bash /sources/lfs/src/lfs.sh stage8_2`  # build in new bash
+`(system root) # bash $LFS/sources/lfs/src/lfs.sh stage8_3`  # reenter chroot
+with new bash
+`(new bash) # bash /sources/lfs/src/lfs.sh stage8_4`  
 
 Step 9: Strip binaries of debugging info  
-`# exec /tools/bin/bash`  
-`# bash /sources/lfs/src/lfs.sh stage9`  
+`# time bash /sources/lfs/src/lfs.sh stage9 ubuntu sdb`  
 
-Step 10: Leave and re-enter chroot environment  
-`# exit`  
-`# exit`  
-```
-chroot "$LFS" /usr/bin/env -i          \
-    HOME=/root TERM="$TERM"            \
-    PS1='(lfs chroot) \u:\w\$ '        \
-    PATH=/bin:/usr/bin:/sbin:/usr/sbin \
-    /bin/bash --login
-```
+Step 10: Outside of the chroot environment, unmount virtual files  
+`(system root) # bash lfs.sh stage10`  
 
-Step 11: Strip debug info, perform further setup  
-`# bash /sources/lfs/src/lfs.sh stage11 ubuntu sda 1 2`  
+# Timing Data
+Stage 3:  65m44.110s
+Stage 7:  11m51.246s, 13m30.483s
+Stage 7.2: 21m32.050s
+Stage 8: 191m32.042s, 497m11.804s, 367m50136s
+Stage 8.2: 146m20.825s
+  ch8_69: 7m34.422s
+Stage 9: 2m56.588s
 
-Step 12: Outside of the chroot environment, unmount virtual files  
-`# exit`  
-`# bash lfs.sh stage12`  
+# TODO
+ - [ ] Save some information in a configuration file, rather than passing as
+       environment variables, to minimize amount of argument passing. This should make
+       it easier in the future to automate some stages.
+ - [ ] Also track successfully completed stages, to make it easier to start from a
+       certain point
+ - [ ] Direct logs to a master log file, that can be watched with a single tail -f
+ - [ ] stage8_2 calling logout rather than exit
+ - [ ] ch9_4 gives "no such file: /etc/udev/rules.d/70-persistent-net.rules"
+ - [ ] ch11_3_2 gives "logout: not login shell: use exit"
+
+# Notes
+When running on a kvm/qemu host, set network source mode to bridge and device
+model to e1000e
